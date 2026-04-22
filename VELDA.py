@@ -825,7 +825,7 @@ def build_home_embed(user_rank):
     """Embed d'accueil personnalisé : ne liste que les catégories accessibles au user."""
     p = get_prefix_cached()
     em = discord.Embed(color=embed_color())
-    em.set_author(name="Velda ─ Panel d'aide")
+    em.set_author(name="Velda - Bot Casino")
 
     rank_label = rank_name(user_rank)
     intro = (
