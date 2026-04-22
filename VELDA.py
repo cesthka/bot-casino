@@ -529,121 +529,234 @@ async def send_log(guild, action, author, target=None, desc=None, color=0x2b2d31
 
 # ========================= HELP =========================
 
-def home_embed():
+# Structure centrale : chaque commande porte son rang minimum requis.
+# Une catégorie n'apparaît dans le dropdown que si l'utilisateur a accès à au moins une de ses commandes.
+# Rangs : 0 = Membre, 1 = WL, 2 = Owner, 3 = Sys, 4 = Buyer.
+
+HELP_CATEGORIES = {
+    "eco": {
+        "emoji": "💰",
+        "label": "Économie",
+        "title": "💰  Économie",
+        "items": [
+            # (syntaxe, description, min_rank)
+            ("bal [@user]",        "Balance d'un membre",     0),
+            ("daily / dy",         "Récompense quotidienne",  0),
+            ("dep [somme/all]",    "Déposer en bank",         0),
+            ("with [somme/all]",   "Retirer de la bank",      0),
+            ("give [somme] @user", "Donner des Ryo",          0),
+            ("rob @user",          "Voler (5-30% main)",      0),
+            ("fame @user",         "Famer quelqu'un",         0),
+        ],
+    },
+    "jeux": {
+        "emoji": "🎮",
+        "label": "Jeux",
+        "title": "🎮  Jeux",
+        "items": [
+            ("slots [somme/all]",   "Machine à sous", 0),
+            ("bj [somme/all]",      "Blackjack",      0),
+            ("jackpot [somme/all]", "Jackpot",        0),
+            ("fish",                "Pêche (30min)",  0),
+            ("work",                "Boulot (1h)",    0),
+        ],
+    },
+    "speciaux": {
+        "emoji": "🏆",
+        "label": "Spéciaux",
+        "title": "🏆  Spéciaux",
+        "items": [
+            ("enchere @role", "Lancer une enchère", 2),
+            ("drop [somme]",  "Drop d'argent",      2),
+            ("enquete",       "Lancer une enquête", 3),
+        ],
+    },
+    "admin": {
+        "emoji": "🔧",
+        "label": "Admin",
+        "title": "🔧  Admin",
+        "items": [
+            ("addmoney @user [somme]",    "Ajouter de l'argent", 3),
+            ("removemoney @user [somme]", "Retirer de l'argent", 3),
+            ("resetbal @user",            "Reset balance",       3),
+            ("addxp @user [somme]",       "Ajouter de l'XP",     3),
+            ("resetlevel @user",          "Reset niveau/XP",     3),
+            ("ban @user",                 "Bannir du bot",       3),
+            ("unban @user",               "Débannir du bot",     3),
+        ],
+    },
+    "perms": {
+        "emoji": "👥",
+        "label": "Permissions",
+        "title": "👥  Permissions",
+        "items": [
+            ("wl @user / unwl @user",       "Gérer la whitelist", 2),
+            ("owner @user / unowner @user", "Gérer les owners",   3),
+            ("sys @user / unsys @user",     "Gérer les sys",      4),
+        ],
+    },
+    "system": {
+        "emoji": "⚙️",
+        "label": "Système",
+        "title": "⚙️  Système",
+        "items": [
+            ("setenchere #salon", "Définir le salon des enchères", 3),
+            ("setlog #salon",     "Définir le salon des logs",     4),
+            ("prefix [nouveau]",  "Changer le prefix",             4),
+        ],
+    },
+    "hierarchy": {
+        "emoji": "📋",
+        "label": "Hiérarchie",
+        "title": "📋  Hiérarchie",
+        "min_rank": 2,  # Cette catégorie n'est visible qu'à partir d'Owner
+        "items": [],    # Contenu statique géré dans build_hierarchy_embed
+    },
+}
+
+
+def accessible_items(category_key, user_rank):
+    """Retourne la liste des (syntaxe, description) accessibles au user pour cette catégorie."""
+    cat = HELP_CATEGORIES.get(category_key, {})
+    return [(syntax, desc) for (syntax, desc, min_rank) in cat.get("items", []) if user_rank >= min_rank]
+
+
+def category_visible(category_key, user_rank):
+    """Une catégorie est visible si le user peut accéder à au moins une de ses commandes,
+    ou si elle a un min_rank explicite qu'il atteint (cas de la hiérarchie)."""
+    cat = HELP_CATEGORIES.get(category_key, {})
+    if "min_rank" in cat:
+        return user_rank >= cat["min_rank"]
+    return len(accessible_items(category_key, user_rank)) > 0
+
+
+def build_category_embed(category_key, user_rank):
+    """Construit un embed pour la catégorie donnée, filtré au rang du user."""
+    p = get_prefix_cached()
+    cat = HELP_CATEGORIES[category_key]
+    em = discord.Embed(title=cat["title"], color=embed_color())
+
+    items = accessible_items(category_key, user_rank)
+    if not items:
+        em.description = "*Aucune commande accessible à ton rang.*"
+    else:
+        # Aligne les syntaxes pour un rendu code-block propre
+        max_syntax = max(len(f"{p}{syntax}") for syntax, _ in items)
+        lines = [
+            f"{p}{syntax}".ljust(max_syntax + 2) + f"→ {desc}"
+            for syntax, desc in items
+        ]
+        em.description = "```\n" + "\n".join(lines) + "\n```"
+
+    em.set_footer(text="Made by gp ・ Velda")
+    return em
+
+
+def build_hierarchy_embed(user_rank):
+    """Embed hiérarchie — uniquement visible pour Owner+ (min_rank=2)."""
+    em = discord.Embed(title="📋  Hiérarchie", color=embed_color())
+    lines = ["```\nBuyer > Sys > Owner > Whitelist > Tout le monde\n```\n"]
+    # On affiche chaque niveau, mais on marque celui du user
+    levels = [
+        (4, "👑 **Buyer**",     "Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`"),
+        (3, "🔧 **Sys**",       "`*enquete`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
+        (2, "⭐ **Owner**",      "`*enchere`, `*drop`, `*wl`/`*unwl`"),
+        (1, "✨ **Whitelist**",  "Statut privilégié"),
+        (0, "👤 **Tout le monde**", "Jeux et commandes éco"),
+    ]
+    for rank, name, desc in levels:
+        marker = " ← **toi**" if rank == user_rank else ""
+        lines.append(f"> {name} — {desc}{marker}")
+    em.description = "\n".join(lines)
+    em.set_footer(text="Made by gp ・ Velda")
+    return em
+
+
+def build_home_embed(user_rank):
+    """Embed d'accueil personnalisé : ne liste que les catégories accessibles au user."""
     p = get_prefix_cached()
     em = discord.Embed(color=embed_color())
     em.set_author(name="Velda ─ Panel d'aide")
-    em.description = (
+
+    rank_label = rank_name(user_rank)
+    intro = (
         f"```\n🕐  {get_french_time()}\n```\n"
         f"Bienvenue sur **Velda**.\n\n"
-        f"**Prefix :** `{p}`\n\n"
-        f"> 💰 **Économie** — Bal, daily, dépôts...\n"
-        f"> 🎮 **Jeux** — Slots, BJ, Jackpot...\n"
-        f"> 🏆 **Spéciaux** — Enchères, Drop, Enquête\n"
-        f"> 👥 **Permissions** — Rangs\n"
-        f"> 📋 **Hiérarchie** — Pouvoirs"
+        f"**Prefix :** `{p}` ・ **Ton rang :** {rank_label}\n\n"
     )
+
+    # Liste uniquement les catégories visibles au user (hors Accueil lui-même)
+    category_descriptions = {
+        "eco":       "Bal, daily, dépôts, give, rob...",
+        "jeux":      "Slots, BJ, Jackpot, Fish, Work",
+        "speciaux":  "Enchères, Drop, Enquête",
+        "admin":     "Gérer l'argent et l'XP des membres",
+        "perms":     "Attribuer les rangs",
+        "system":    "Configuration du bot",
+        "hierarchy": "Qui peut faire quoi",
+    }
+    visible_lines = []
+    for key, label in category_descriptions.items():
+        if category_visible(key, user_rank):
+            cat = HELP_CATEGORIES[key]
+            visible_lines.append(f"> {cat['emoji']} **{cat['label']}** — {label}")
+
+    em.description = intro + "\n".join(visible_lines) if visible_lines else intro
     em.set_footer(text="Made by gp ・ Velda")
     return em
 
 
-def eco_embed():
-    p = get_prefix_cached()
-    em = discord.Embed(title="💰  Économie", color=embed_color())
-    em.description = (
-        f"```\n"
-        f"{p}bal [@user]          → Balance\n"
-        f"{p}daily / {p}dy         → Récompense quotidienne\n"
-        f"{p}dep [somme/all]      → Déposer en bank\n"
-        f"{p}with [somme/all]     → Retirer de la bank\n"
-        f"{p}give [somme] @user   → Donner des Ryo\n"
-        f"{p}rob @user            → Voler (5-30% main)\n"
-        f"{p}fame @user           → Famer quelqu'un\n"
-        f"```"
-    )
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
-
-
-def jeux_embed():
-    p = get_prefix_cached()
-    em = discord.Embed(title="🎮  Jeux", color=embed_color())
-    em.description = (
-        f"```\n"
-        f"{p}slots [somme/all]    → Machine à sous\n"
-        f"{p}bj [somme/all]       → Blackjack\n"
-        f"{p}jackpot [somme/all]  → Jackpot\n"
-        f"{p}fish                 → Pêche (30min)\n"
-        f"{p}work                 → Boulot (1h)\n"
-        f"```"
-    )
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
-
-
-def speciaux_embed():
-    p = get_prefix_cached()
-    em = discord.Embed(title="🏆  Spéciaux", color=embed_color())
-    em.description = (
-        f"```\n"
-        f"{p}enchere @role        → Lancer une enchère (Owner+)\n"
-        f"{p}drop [somme]         → Drop d'argent (Owner+)\n"
-        f"{p}enquete              → Lancer une enquête (Sys+)\n"
-        f"```"
-    )
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
-
-
-def perms_embed():
-    p = get_prefix_cached()
-    em = discord.Embed(title="👥  Permissions", color=embed_color())
-    em.description = (
-        f"**Whitelist**\n```\n{p}wl @user / {p}unwl @user\n```\n"
-        f"**Owner**\n```\n{p}owner @user / {p}unowner @user\n```\n"
-        f"**Sys**\n```\n{p}sys @user / {p}unsys @user\n```"
-    )
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
-
-
-def hierarchy_embed():
-    em = discord.Embed(title="📋  Hiérarchie", color=embed_color())
-    em.description = (
-        "```\nBuyer > Sys > Owner > Whitelist > Tout le monde\n```\n\n"
-        "> 👑 **Buyer** — Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`\n"
-        "> 🔧 **Sys** — `*enquete`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, `*addmoney`, `*removemoney`, `*resetbal`, `*addxp`, `*resetlevel`\n"
-        "> ⭐ **Owner** — `*enchere`, `*drop`, `*wl`/`*unwl`\n"
-        "> 👤 **Tout le monde** — Tous les jeux et commandes éco\n"
-    )
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
+def build_embed_for(category_key, user_rank):
+    """Dispatcher : renvoie l'embed correspondant à la clé demandée."""
+    if category_key == "home":
+        return build_home_embed(user_rank)
+    if category_key == "hierarchy":
+        return build_hierarchy_embed(user_rank)
+    return build_category_embed(category_key, user_rank)
 
 
 class HelpDropdown(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="Accueil", emoji="🏠", value="home"),
-            discord.SelectOption(label="Économie", emoji="💰", value="eco"),
-            discord.SelectOption(label="Jeux", emoji="🎮", value="jeux"),
-            discord.SelectOption(label="Spéciaux", emoji="🏆", value="speciaux"),
-            discord.SelectOption(label="Permissions", emoji="👥", value="perms"),
-            discord.SelectOption(label="Hiérarchie", emoji="📋", value="hierarchy"),
-        ]
-        super().__init__(placeholder="📂 Choisis une catégorie...", min_values=1, max_values=1, options=options)
+    def __init__(self, user_rank):
+        self.user_rank = user_rank
+        options = [discord.SelectOption(label="Accueil", emoji="🏠", value="home")]
+        # Ajoute uniquement les catégories dont l'utilisateur peut voir quelque chose
+        for key, cat in HELP_CATEGORIES.items():
+            if category_visible(key, user_rank):
+                options.append(discord.SelectOption(
+                    label=cat["label"], emoji=cat["emoji"], value=key
+                ))
+        super().__init__(
+            placeholder="📂 Choisis une catégorie...",
+            min_values=1, max_values=1, options=options
+        )
 
     async def callback(self, interaction: discord.Interaction):
-        embeds = {
-            "home": home_embed, "eco": eco_embed, "jeux": jeux_embed,
-            "speciaux": speciaux_embed, "perms": perms_embed, "hierarchy": hierarchy_embed,
-        }
-        await interaction.response.edit_message(embed=embeds[self.values[0]](), view=self.view)
+        # Double-check : on n'affiche que ce que le user peut voir (au cas où)
+        key = self.values[0]
+        if key != "home" and not category_visible(key, self.user_rank):
+            return await interaction.response.send_message(
+                "Tu n'as pas accès à cette catégorie.", ephemeral=True
+            )
+        await interaction.response.edit_message(
+            embed=build_embed_for(key, self.user_rank), view=self.view
+        )
 
 
 class HelpView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, author_id, user_rank):
         super().__init__(timeout=120)
-        self.add_item(HelpDropdown())
+        self.author_id = author_id
+        self.user_rank = user_rank
+        self.add_item(HelpDropdown(user_rank))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Seul celui qui a lancé *help peut naviguer dans son menu
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "Ce menu n'est pas à toi. Fais `*help` pour voir le tien.", ephemeral=True
+            )
+            return False
+        return True
 
     async def on_timeout(self):
         for item in self.children:
@@ -652,7 +765,9 @@ class HelpView(discord.ui.View):
 
 @bot.command(name="help")
 async def _help(ctx):
-    await ctx.send(embed=home_embed(), view=HelpView())
+    user_rank = get_rank_db(ctx.author.id)
+    view = HelpView(ctx.author.id, user_rank)
+    await ctx.send(embed=build_home_embed(user_rank), view=view)
 
 
 # ========================= SYSTÈME =========================
