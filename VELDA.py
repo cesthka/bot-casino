@@ -417,6 +417,71 @@ async def resolve_member(ctx, user_input):
         return None
 
 
+async def resolve_user_or_id(ctx, user_input):
+    """
+    Résout un input (mention, ID, nom) en (display_obj, user_id).
+    - Si l'user est membre du serveur :                 (Member, id)
+    - S'il existe globalement mais pas sur le serveur : (User, id)
+    - Si seul un ID numérique est donné et qu'on ne trouve rien : (None, id)
+    - Si on ne peut rien parser :                       (None, None)
+
+    Utilisé pour les commandes de rang/ban qui doivent marcher même quand
+    le user a quitté le serveur (ex: unsys sur un owner parti).
+    """
+    if not user_input:
+        return None, None
+
+    raw = user_input.strip()
+    cleaned = raw.strip("<@!>")
+
+    # 1) Tentative : c'est un ID numérique ?
+    user_id = None
+    try:
+        user_id = int(cleaned)
+    except ValueError:
+        # Ce n'est pas un ID brut — on tente les converters par nom
+        try:
+            member = await commands.MemberConverter().convert(ctx, raw)
+            return member, member.id
+        except commands.CommandError:
+            pass
+        try:
+            user = await commands.UserConverter().convert(ctx, raw)
+            return user, user.id
+        except commands.CommandError:
+            return None, None
+
+    # 2) On a un ID. Regarde d'abord dans les membres du serveur (pas d'appel API)
+    if ctx.guild:
+        member = ctx.guild.get_member(user_id)
+        if member:
+            return member, user_id
+
+    # 3) Pas membre : tente fetch_user pour avoir au moins le nom (appel API)
+    try:
+        user = await bot.fetch_user(user_id)
+        return user, user_id
+    except discord.NotFound:
+        # L'ID ne correspond à aucun compte Discord — on accepte quand même l'ID
+        # pour permettre le nettoyage de la base (cas d'un compte supprimé)
+        return None, user_id
+    except discord.HTTPException as e:
+        log.warning(f"resolve_user_or_id: échec fetch_user({user_id}) : {e}")
+        return None, user_id
+
+
+def format_user_display(display_obj, user_id):
+    """
+    Formatte un user pour affichage dans les embeds.
+    Si on a un objet (Member/User) on utilise sa mention, sinon on affiche l'ID brut
+    avec un marqueur indiquant qu'on est hors serveur.
+    """
+    if display_obj is not None:
+        # Member a .mention, User aussi
+        return f"{display_obj.mention} (`{display_obj.id}`)"
+    return f"<@{user_id}> (`{user_id}`) *(hors serveur)*"
+
+
 def atomic_transfer(from_id, to_id, amount):
     """
     Transfert atomique entre deux utilisateurs en une seule transaction SQLite.
@@ -1006,171 +1071,264 @@ async def _unallow(ctx, *, channel_input: str = None):
 # ========================= RANGS =========================
 
 @bot.command(name="sys")
-async def _sys(ctx, member: discord.Member = None):
-    if member is None:
+async def _sys(ctx, *, user_input: str = None):
+    # Sans argument : liste les sys (Buyer seul)
+    if user_input is None:
         if not has_min_rank(ctx.author.id, 4):
             return await ctx.send(embed=error_embed("❌ Permission refusée", "**Buyer** requis."))
         ids = get_ranks_by_level(3)
         if not ids:
             return await ctx.send(embed=info_embed("📋 Liste Sys", "Aucun sys."))
         return await ctx.send(embed=info_embed(f"📋 Liste Sys ({len(ids)})", "\n".join([f"<@{uid}>" for uid in ids])))
+
     if not has_min_rank(ctx.author.id, 4):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Buyer** requis."))
-    if get_rank_db(member.id) == 3:
-        return await ctx.send(embed=error_embed("Déjà Sys", f"{member.mention} est déjà sys."))
-    set_rank_db(member.id, 3)
-    await ctx.send(embed=success_embed("✅ Sys ajouté", f"{member.mention} ajouté en **sys**."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if get_rank_db(user_id) == 3:
+        return await ctx.send(embed=error_embed("Déjà Sys", f"{format_user_display(display_obj, user_id)} est déjà sys."))
+    set_rank_db(user_id, 3)
+    await ctx.send(embed=success_embed("✅ Sys ajouté", f"{format_user_display(display_obj, user_id)} ajouté en **sys**."))
 
 
 @bot.command(name="unsys")
-async def _unsys(ctx, member: discord.Member = None):
+async def _unsys(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 4):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Buyer** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    if get_rank_db(member.id) != 3:
-        return await ctx.send(embed=error_embed("Pas Sys", f"{member.mention} n'est pas sys."))
-    set_rank_db(member.id, 0)
-    await ctx.send(embed=success_embed("✅ Sys retiré", f"{member.mention} retiré des **sys**."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if get_rank_db(user_id) != 3:
+        return await ctx.send(embed=error_embed("Pas Sys", f"{format_user_display(display_obj, user_id)} n'est pas sys."))
+    set_rank_db(user_id, 0)
+    await ctx.send(embed=success_embed("✅ Sys retiré", f"{format_user_display(display_obj, user_id)} retiré des **sys**."))
 
 
 @bot.command(name="owner")
-async def _owner(ctx, member: discord.Member = None):
-    if member is None:
+async def _owner(ctx, *, user_input: str = None):
+    if user_input is None:
         if not has_min_rank(ctx.author.id, 3):
             return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
         ids = get_ranks_by_level(2)
         if not ids:
             return await ctx.send(embed=info_embed("📋 Liste Owner", "Aucun owner."))
         return await ctx.send(embed=info_embed(f"📋 Liste Owner ({len(ids)})", "\n".join([f"<@{uid}>" for uid in ids])))
+
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if get_rank_db(member.id) >= 3:
-        return await ctx.send(embed=error_embed("❌ Erreur", f"{member.mention} a un rang supérieur ou égal."))
-    set_rank_db(member.id, 2)
-    await ctx.send(embed=success_embed("✅ Owner ajouté", f"{member.mention} ajouté en **owner**."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if get_rank_db(user_id) >= 3:
+        return await ctx.send(embed=error_embed("❌ Erreur", f"{format_user_display(display_obj, user_id)} a un rang supérieur ou égal."))
+    set_rank_db(user_id, 2)
+    await ctx.send(embed=success_embed("✅ Owner ajouté", f"{format_user_display(display_obj, user_id)} ajouté en **owner**."))
 
 
 @bot.command(name="unowner")
-async def _unowner(ctx, member: discord.Member = None):
+async def _unowner(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    if get_rank_db(member.id) != 2:
-        return await ctx.send(embed=error_embed("Pas Owner", f"{member.mention} n'est pas owner."))
-    set_rank_db(member.id, 0)
-    await ctx.send(embed=success_embed("✅ Owner retiré", f"{member.mention} retiré des **owners**."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if get_rank_db(user_id) != 2:
+        return await ctx.send(embed=error_embed("Pas Owner", f"{format_user_display(display_obj, user_id)} n'est pas owner."))
+    set_rank_db(user_id, 0)
+    await ctx.send(embed=success_embed("✅ Owner retiré", f"{format_user_display(display_obj, user_id)} retiré des **owners**."))
 
 
 @bot.command(name="wl")
-async def _wl(ctx, member: discord.Member = None):
-    if member is None:
+async def _wl(ctx, *, user_input: str = None):
+    if user_input is None:
         if not has_min_rank(ctx.author.id, 2):
             return await ctx.send(embed=error_embed("❌ Permission refusée", "**Owner+** requis."))
         ids = get_ranks_by_level(1)
         if not ids:
             return await ctx.send(embed=info_embed("📋 Whitelist", "Aucun wl."))
         return await ctx.send(embed=info_embed(f"📋 Whitelist ({len(ids)})", "\n".join([f"<@{uid}>" for uid in ids])))
+
     if not has_min_rank(ctx.author.id, 2):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Owner+** requis."))
-    if get_rank_db(member.id) >= 2:
-        return await ctx.send(embed=error_embed("❌ Erreur", f"{member.mention} a un rang supérieur ou égal."))
-    set_rank_db(member.id, 1)
-    await ctx.send(embed=success_embed("✅ WL ajouté", f"{member.mention} ajouté à la **whitelist**."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if get_rank_db(user_id) >= 2:
+        return await ctx.send(embed=error_embed("❌ Erreur", f"{format_user_display(display_obj, user_id)} a un rang supérieur ou égal."))
+    set_rank_db(user_id, 1)
+    await ctx.send(embed=success_embed("✅ WL ajouté", f"{format_user_display(display_obj, user_id)} ajouté à la **whitelist**."))
 
 
 @bot.command(name="unwl")
-async def _unwl(ctx, member: discord.Member = None):
+async def _unwl(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 2):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Owner+** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    if get_rank_db(member.id) != 1:
-        return await ctx.send(embed=error_embed("Pas WL", f"{member.mention} n'est pas wl."))
-    set_rank_db(member.id, 0)
-    await ctx.send(embed=success_embed("✅ WL retiré", f"{member.mention} retiré de la **whitelist**."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if get_rank_db(user_id) != 1:
+        return await ctx.send(embed=error_embed("Pas WL", f"{format_user_display(display_obj, user_id)} n'est pas wl."))
+    set_rank_db(user_id, 0)
+    await ctx.send(embed=success_embed("✅ WL retiré", f"{format_user_display(display_obj, user_id)} retiré de la **whitelist**."))
 
 
 # ========================= BAN BOT =========================
 
 @bot.command(name="ban")
-async def _ban(ctx, member: discord.Member = None):
+async def _ban(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    if is_bot_banned(member.id):
-        return await ctx.send(embed=error_embed("Déjà banni", f"{member.mention} est déjà banni du bot."))
-    add_bot_ban(member.id, ctx.author.id)
-    await ctx.send(embed=success_embed("⛔ Banni du bot", f"{member.mention} ne peut plus utiliser **Velda**."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if is_bot_banned(user_id):
+        return await ctx.send(embed=error_embed("Déjà banni", f"{format_user_display(display_obj, user_id)} est déjà banni du bot."))
+    add_bot_ban(user_id, ctx.author.id)
+    await ctx.send(embed=success_embed("⛔ Banni du bot", f"{format_user_display(display_obj, user_id)} ne peut plus utiliser **Velda**."))
 
 
 @bot.command(name="unban")
-async def _unban(ctx, member: discord.Member = None):
+async def _unban(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    if not is_bot_banned(member.id):
-        return await ctx.send(embed=error_embed("Pas banni", f"{member.mention} n'est pas banni du bot."))
-    remove_bot_ban(member.id)
-    await ctx.send(embed=success_embed("✅ Débanni", f"{member.mention} peut à nouveau utiliser **Velda**."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    if not is_bot_banned(user_id):
+        return await ctx.send(embed=error_embed("Pas banni", f"{format_user_display(display_obj, user_id)} n'est pas banni du bot."))
+    remove_bot_ban(user_id)
+    await ctx.send(embed=success_embed("✅ Débanni", f"{format_user_display(display_obj, user_id)} peut à nouveau utiliser **Velda**."))
 
 
 # ========================= ADMIN ECO =========================
 
+def _parse_admin_args(user_input):
+    """
+    Sépare '@user 5000' ou 'id 5000' en (user_part, amount_int).
+    Retourne (user_part, None) si pas de montant, (None, None) si input vide.
+    """
+    if not user_input:
+        return None, None
+    parts = user_input.rsplit(" ", 1)
+    if len(parts) == 1:
+        return parts[0], None
+    try:
+        amount = int(parts[1].replace(",", "").replace(" ", ""))
+        return parts[0], amount
+    except ValueError:
+        # Le dernier token n'est pas un nombre : tout l'input est le user_part
+        return user_input, None
+
+
 @bot.command(name="addmoney")
-async def _addmoney(ctx, member: discord.Member = None, amount: int = None):
+async def _addmoney(ctx, *, args: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member or not amount:
+    user_part, amount = _parse_admin_args(args)
+    if not user_part or amount is None or amount <= 0:
         return await ctx.send(embed=error_embed("Arguments manquants", "Usage : `*addmoney @user [somme]`"))
-    eco = get_economy(member.id)
-    update_economy(member.id, hand=eco["hand"] + amount)
-    await ctx.send(embed=success_embed("✅ Argent ajouté", f"+{format_ryo(amount)} ajouté à {member.mention}."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_part)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    async with eco_lock:
+        atomic_hand_delta(user_id, amount, min_hand=0)
+    await ctx.send(embed=success_embed("✅ Argent ajouté", f"+{format_ryo(amount)} ajouté à {format_user_display(display_obj, user_id)}."))
 
 
 @bot.command(name="removemoney")
-async def _removemoney(ctx, member: discord.Member = None, amount: int = None):
+async def _removemoney(ctx, *, args: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member or not amount:
+    user_part, amount = _parse_admin_args(args)
+    if not user_part or amount is None or amount <= 0:
         return await ctx.send(embed=error_embed("Arguments manquants", "Usage : `*removemoney @user [somme]`"))
-    eco = get_economy(member.id)
-    new_hand = max(0, eco["hand"] - amount)
-    update_economy(member.id, hand=new_hand)
-    await ctx.send(embed=success_embed("✅ Argent retiré", f"-{format_ryo(amount)} retiré à {member.mention}."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_part)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    async with eco_lock:
+        eco = get_economy(user_id)
+        new_hand = max(0, eco["hand"] - amount)
+        update_economy(user_id, hand=new_hand)
+    await ctx.send(embed=success_embed("✅ Argent retiré", f"-{format_ryo(amount)} retiré à {format_user_display(display_obj, user_id)}."))
 
 
 @bot.command(name="resetbal")
-async def _resetbal(ctx, member: discord.Member = None):
+async def _resetbal(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    update_economy(member.id, hand=0, bank=0)
-    await ctx.send(embed=success_embed("✅ Balance reset", f"La balance de {member.mention} a été remise à 0."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    async with eco_lock:
+        update_economy(user_id, hand=0, bank=0)
+    await ctx.send(embed=success_embed("✅ Balance reset", f"La balance de {format_user_display(display_obj, user_id)} a été remise à 0."))
 
 
 @bot.command(name="addxp")
-async def _addxp(ctx, member: discord.Member = None, amount: int = None):
+async def _addxp(ctx, *, args: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member or not amount:
+    user_part, amount = _parse_admin_args(args)
+    if not user_part or amount is None or amount <= 0:
         return await ctx.send(embed=error_embed("Arguments manquants", "Usage : `*addxp @user [somme]`"))
-    await add_xp(ctx, member.id, amount)
-    await ctx.send(embed=success_embed("✅ XP ajouté", f"+{amount} XP ajouté à {member.mention}."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_part)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    await add_xp(ctx, user_id, amount)
+    await ctx.send(embed=success_embed("✅ XP ajouté", f"+{amount} XP ajouté à {format_user_display(display_obj, user_id)}."))
 
 
 @bot.command(name="resetlevel")
-async def _resetlevel(ctx, member: discord.Member = None):
+async def _resetlevel(ctx, *, user_input: str = None):
     if not has_min_rank(ctx.author.id, 3):
         return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-    if not member:
-        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur."))
-    update_economy(member.id, xp=0, level=0)
-    await ctx.send(embed=success_embed("✅ Niveau reset", f"Le niveau de {member.mention} a été remis à 0."))
+    if not user_input:
+        return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un utilisateur ou donne son ID."))
+
+    display_obj, user_id = await resolve_user_or_id(ctx, user_input)
+    if user_id is None:
+        return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
+
+    async with eco_lock:
+        update_economy(user_id, xp=0, level=0)
+    await ctx.send(embed=success_embed("✅ Niveau reset", f"Le niveau de {format_user_display(display_obj, user_id)} a été remis à 0."))
 
 
 # ========================= ÉCONOMIE =========================
