@@ -301,10 +301,12 @@ async def add_xp(ctx, user_id, amount):
     update_economy(user_id, xp=new_xp, level=new_level, hand=new_hand)
 
     if new_level > current_level:
-        em = discord.Embed(
-            title="🎉 Level Up !",
-            description=f"<@{user_id}> est passé au niveau **{new_level}** !\n+{format_ryo(bonus)} en récompense !",
-            color=0xffd700
+        em = discord.Embed(color=0xffd700)
+        em.set_author(name="🎉 Level Up !", icon_url=ctx.bot.user.display_avatar.url)
+        em.description = (
+            f"👤 **Joueur**\n<@{user_id}>\n\n"
+            f"🎯 **Nouveau niveau**\n{new_level} / 100\n\n"
+            f"💰 **Récompense**\n+{format_ryo(bonus)}"
         )
         em.set_footer(text="Velda")
         await ctx.send(embed=em)
@@ -711,17 +713,27 @@ async def _bal(ctx, *, user_input: str = None):
                 target = ctx.author
 
     eco = get_economy(target.id)
-    xp_needed = xp_for_level(eco["level"] + 1) if eco["level"] < 100 else 0
-    xp_progress = eco["xp"] - xp_for_level(eco["level"]) if eco["level"] > 0 else eco["xp"]
-    xp_required = xp_needed - xp_for_level(eco["level"]) if eco["level"] > 0 else xp_needed
+    xp_current = eco["xp"] - xp_for_level(eco["level"]) if eco["level"] > 0 else eco["xp"]
+    xp_next = xp_for_level(eco["level"] + 1) - xp_for_level(eco["level"]) if eco["level"] < 100 else 0
+    total = eco["hand"] + eco["bank"]
 
-    em = discord.Embed(title=f"💰 Balance — {target.display_name}", color=embed_color())
-    em.set_thumbnail(url=target.display_avatar.url)
-    em.add_field(name="👜 En main", value=format_ryo(eco["hand"]), inline=True)
-    em.add_field(name="🏦 En bank", value=format_ryo(eco["bank"]), inline=True)
-    em.add_field(name="⭐ Fame", value=str(eco["fame"]), inline=True)
-    em.add_field(name="🎯 Niveau", value=f"**{eco['level']}** / 100", inline=True)
-    em.add_field(name="✨ XP", value=f"{xp_progress} / {xp_required if eco['level'] < 100 else 'MAX'}", inline=True)
+    # Barre de progression XP
+    if eco["level"] < 100 and xp_next > 0:
+        filled = int((xp_current / xp_next) * 10)
+        bar = "█" * filled + "░" * (10 - filled)
+        xp_str = f"`{bar}` {xp_current}/{xp_next}"
+    else:
+        xp_str = "`██████████` MAX"
+
+    em = discord.Embed(color=embed_color())
+    em.set_author(name=f"Balance de {target.display_name}", icon_url=target.display_avatar.url)
+    em.description = (
+        f"👜 **En main**\n{format_ryo(eco['hand'])}\n\n"
+        f"🏦 **En bank**\n{format_ryo(eco['bank'])}\n\n"
+        f"💰 **Total**\n{format_ryo(total)}\n\n"
+        f"⭐ **Fame**\n{eco['fame']} point{'s' if eco['fame'] > 1 else ''}\n\n"
+        f"🎯 **Niveau {eco['level']} / 100**\n{xp_str}"
+    )
     em.set_footer(text=f"Velda ・ {get_french_time()}")
     await ctx.send(embed=em)
 
@@ -745,7 +757,15 @@ async def _daily(ctx):
     amount = random.randint(10000, 30000)
     update_economy(ctx.author.id, hand=eco["hand"] + amount, last_daily=now.isoformat())
     await add_xp(ctx, ctx.author.id, 50)
-    await ctx.send(embed=success_embed("✅ Daily récupéré !", f"+{format_ryo(amount)} en main !"))
+
+    em = discord.Embed(color=0x43b581)
+    em.set_author(name="Daily récupéré !", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"✅ **Récompense du jour**\n+{format_ryo(amount)}\n\n"
+        f"👜 **Nouveau solde en main**\n{format_ryo(eco['hand'] + amount)}"
+    )
+    em.set_footer(text="Velda ・ Reviens demain !")
+    await ctx.send(embed=em)
 
 
 @bot.command(name="dep")
@@ -761,7 +781,15 @@ async def _dep(ctx, amount_str: str = None):
     if amount > eco["hand"]:
         return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
     update_economy(ctx.author.id, hand=eco["hand"] - amount, bank=eco["bank"] + amount)
-    await ctx.send(embed=success_embed("🏦 Dépôt effectué", f"+{format_ryo(amount)} déposés en bank."))
+    em = discord.Embed(color=0x3498db)
+    em.set_author(name="Dépôt effectué", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"🏦 **Déposé en bank**\n+{format_ryo(amount)}\n\n"
+        f"👜 **En main**\n{format_ryo(eco['hand'] - amount)}\n\n"
+        f"🏦 **En bank**\n{format_ryo(eco['bank'] + amount)}"
+    )
+    em.set_footer(text="Velda")
+    await ctx.send(embed=em)
 
 
 @bot.command(name="withdraw", aliases=["with"])
@@ -777,7 +805,15 @@ async def _withdraw(ctx, amount_str: str = None):
     if amount > eco["bank"]:
         return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['bank'])} en bank."))
     update_economy(ctx.author.id, hand=eco["hand"] + amount, bank=eco["bank"] - amount)
-    await ctx.send(embed=success_embed("👜 Retrait effectué", f"+{format_ryo(amount)} retirés en main."))
+    em = discord.Embed(color=0x3498db)
+    em.set_author(name="Retrait effectué", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"👜 **Retiré en main**\n+{format_ryo(amount)}\n\n"
+        f"👜 **En main**\n{format_ryo(eco['hand'] + amount)}\n\n"
+        f"🏦 **En bank**\n{format_ryo(eco['bank'] - amount)}"
+    )
+    em.set_footer(text="Velda")
+    await ctx.send(embed=em)
 
 
 @bot.command(name="give")
@@ -811,7 +847,17 @@ async def _give(ctx, amount_str: str = None, *, user_input: str = None):
     eco_target = get_economy(target.id)
     update_economy(ctx.author.id, hand=eco["hand"] - amount)
     update_economy(target.id, hand=eco_target["hand"] + amount)
-    await ctx.send(embed=success_embed("✅ Don effectué", f"{ctx.author.mention} a donné {format_ryo(amount)} à {target.mention}."))
+
+    em = discord.Embed(color=0x43b581)
+    em.set_author(name="✅ Don effectué", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"👤 **De**\n{ctx.author.mention}\n\n"
+        f"🎯 **À**\n{target.mention}\n\n"
+        f"💸 **Montant**\n{format_ryo(amount)}\n\n"
+        f"👜 **Ta main maintenant**\n{format_ryo(eco['hand'] - amount)}"
+    )
+    em.set_footer(text="Velda")
+    await ctx.send(embed=em)
 
 
 @bot.command(name="rob")
@@ -848,7 +894,16 @@ async def _rob(ctx, *, user_input: str = None):
     update_economy(target.id, hand=eco_target["hand"] - stolen)
     update_economy(ctx.author.id, hand=eco_author["hand"] + stolen)
     await add_xp(ctx, ctx.author.id, 20)
-    await ctx.send(embed=success_embed("🥷 Vol réussi !", f"Tu as volé {format_ryo(stolen)} ({int(percent*100)}%) à {target.mention} !"))
+
+    em = discord.Embed(color=0xf04747)
+    em.set_author(name="🥷 Vol réussi !", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"🎯 **Cible**\n{target.mention}\n\n"
+        f"💸 **Volé**\n{format_ryo(stolen)} ({int(percent*100)}% de sa main)\n\n"
+        f"👜 **Ta main maintenant**\n{format_ryo(eco_author['hand'] + stolen)}"
+    )
+    em.set_footer(text="Velda")
+    await ctx.send(embed=em)
 
 
 @bot.command(name="fame")
@@ -886,7 +941,16 @@ async def _fame(ctx, *, user_input: str = None):
     eco_target = get_economy(target.id)
     update_economy(target.id, fame=eco_target["fame"] + 1)
     update_economy(ctx.author.id, last_fame=now.isoformat())
-    await ctx.send(embed=success_embed("⭐ Fame !", f"{ctx.author.mention} a famé {target.mention} ! ({eco_target['fame'] + 1} fame)"))
+
+    em = discord.Embed(color=0xffd700)
+    em.set_author(name="⭐ Fame !", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"👤 **Famé par**\n{ctx.author.mention}\n\n"
+        f"🎯 **Cible**\n{target.mention}\n\n"
+        f"⭐ **Total fame de {target.display_name}**\n{eco_target['fame'] + 1} point{'s' if eco_target['fame'] + 1 > 1 else ''}"
+    )
+    em.set_footer(text="Velda ・ Cooldown 2h")
+    await ctx.send(embed=em)
 
 
 # ========================= JEUX =========================
@@ -923,9 +987,14 @@ async def _work(ctx):
     update_economy(ctx.author.id, hand=eco["hand"] + amount, last_work=now.isoformat())
     await add_xp(ctx, ctx.author.id, 30)
 
-    em = discord.Embed(title=f"💼 Boulot — {job.capitalize()}", color=embed_color())
-    em.description = f"{desc}\n\n**+{format_ryo(amount)}** gagnés !"
-    em.set_footer(text="Velda")
+    em = discord.Embed(color=embed_color())
+    em.set_author(name=f"💼 {job.capitalize()}", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"📝 **Mission**\n{desc}\n\n"
+        f"💸 **Salaire**\n+{format_ryo(amount)}\n\n"
+        f"👜 **En main maintenant**\n{format_ryo(eco['hand'] + amount)}"
+    )
+    em.set_footer(text="Velda ・ Cooldown 1h")
     await ctx.send(embed=em)
 
 
@@ -964,9 +1033,14 @@ async def _fish(ctx):
     await add_xp(ctx, ctx.author.id, xp_gain.get(rarity, 10))
 
     rarity_colors = {"commun": 0x95a5a6, "peu commun": 0x2ecc71, "rare": 0x3498db, "épique": 0x9b59b6, "légendaire": 0xf1c40f, "déchet": 0x7f8c8d}
-    em = discord.Embed(title=f"🎣 Pêche — {rarity.upper()}", color=rarity_colors.get(rarity, embed_color()))
-    em.description = f"Tu as pêché un **{name}** !\n\n+**{format_ryo(amount)}** gagnés !"
-    em.set_footer(text="Velda")
+    em = discord.Embed(color=rarity_colors.get(rarity, embed_color()))
+    em.set_author(name=f"🎣 Pêche — {rarity.upper()}", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"🐟 **Prise**\n{name}\n\n"
+        f"💸 **Valeur**\n+{format_ryo(amount)}\n\n"
+        f"👜 **En main maintenant**\n{format_ryo(eco['hand'] + amount)}"
+    )
+    em.set_footer(text="Velda ・ Cooldown 30min")
     await ctx.send(embed=em)
 
 
@@ -992,24 +1066,36 @@ async def _slots(ctx, amount_str: str = None):
     if reels[0] == reels[1] == reels[2]:
         mult = multipliers.get(reels[0], 2)
         winnings = int(amount * mult)
-        result = f"JACKPOT ! x{mult} — +{format_ryo(winnings)}"
+        result = f"🎊 JACKPOT ! x{mult}"
         color = 0xffd700
-        update_economy(ctx.author.id, hand=eco["hand"] - amount + winnings)
+        new_hand = eco["hand"] - amount + winnings
+        update_economy(ctx.author.id, hand=new_hand)
         await add_xp(ctx, ctx.author.id, 50)
     elif reels[0] == reels[1] or reels[1] == reels[2]:
         winnings = int(amount * 1.5)
-        result = f"Deux identiques ! x1.5 — +{format_ryo(winnings)}"
+        result = f"✅ Deux identiques ! x1.5"
         color = 0x43b581
-        update_economy(ctx.author.id, hand=eco["hand"] - amount + winnings)
+        new_hand = eco["hand"] - amount + winnings
+        update_economy(ctx.author.id, hand=new_hand)
         await add_xp(ctx, ctx.author.id, 15)
     else:
-        result = f"Perdu — -{format_ryo(amount)}"
+        winnings = 0
+        result = f"❌ Perdu"
         color = 0xf04747
-        update_economy(ctx.author.id, hand=eco["hand"] - amount)
+        new_hand = eco["hand"] - amount
+        update_economy(ctx.author.id, hand=new_hand)
         await add_xp(ctx, ctx.author.id, 5)
 
-    em = discord.Embed(title="🎰 Machine à sous", color=color)
-    em.description = f"[ {reels[0]} | {reels[1]} | {reels[2]} ]\n\n{result}"
+    gain_str = f"+{format_ryo(winnings)}" if winnings > 0 else f"-{format_ryo(amount)}"
+
+    em = discord.Embed(color=color)
+    em.set_author(name="🎰 Machine à sous", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"🎰 **Rouleaux**\n`[ {reels[0]}  {reels[1]}  {reels[2]} ]`\n\n"
+        f"📊 **Résultat**\n{result} ({gain_str})\n\n"
+        f"💰 **Mise**\n{format_ryo(amount)}\n\n"
+        f"👜 **En main maintenant**\n{format_ryo(new_hand)}"
+    )
     em.set_footer(text="Velda")
     await ctx.send(embed=em)
 
@@ -1047,16 +1133,25 @@ async def _jackpot(ctx, amount_str: str = None):
 
     if mult > 0:
         winnings = int(amount * mult)
-        update_economy(ctx.author.id, hand=eco["hand"] - amount + winnings)
+        new_hand = eco["hand"] - amount + winnings
+        update_economy(ctx.author.id, hand=new_hand)
         await add_xp(ctx, ctx.author.id, mult * 10)
-        result_text += f"\n\n+{format_ryo(winnings)} !"
+        gain_str = f"+{format_ryo(winnings)}"
     else:
-        update_economy(ctx.author.id, hand=eco["hand"] - amount)
+        winnings = 0
+        new_hand = eco["hand"] - amount
+        update_economy(ctx.author.id, hand=new_hand)
         await add_xp(ctx, ctx.author.id, 5)
-        result_text += f"\n\n-{format_ryo(amount)}"
+        gain_str = f"-{format_ryo(amount)}"
 
-    em = discord.Embed(title="🎲 Jackpot", color=color)
-    em.description = result_text
+    em = discord.Embed(color=color)
+    em.set_author(name="🎲 Jackpot", icon_url=ctx.author.display_avatar.url)
+    em.description = (
+        f"🎲 **Tirage**\n{result_text}\n\n"
+        f"📊 **Gain/Perte**\n{gain_str}\n\n"
+        f"💰 **Mise**\n{format_ryo(amount)}\n\n"
+        f"👜 **En main maintenant**\n{format_ryo(new_hand)}"
+    )
     em.set_footer(text="Velda")
     await ctx.send(embed=em)
 
