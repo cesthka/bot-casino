@@ -729,7 +729,6 @@ HELP_CATEGORIES = {
         "items": [
             ("enchere @role", "Lancer une enchère", 2),
             ("drop [somme]",  "Drop d'argent",      2),
-            ("enquete",       "Lancer une enquête", 3),
         ],
     },
     "admin": {
@@ -823,7 +822,7 @@ def build_hierarchy_embed(user_rank):
     # On affiche chaque niveau, mais on marque celui du user
     levels = [
         (4, "👑 **Buyer**",     "Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`"),
-        (3, "🔧 **Sys**",       "`*allow`/`*unallow`, `*enquete`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
+        (3, "🔧 **Sys**",       "`*allow`/`*unallow`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
         (2, "⭐ **Owner**",      "`*enchere`, `*drop`, `*wl`/`*unwl`"),
         (1, "✨ **Whitelist**",  "Statut privilégié"),
         (0, "👤 **Tout le monde**", "Jeux et commandes éco"),
@@ -853,7 +852,7 @@ def build_home_embed(user_rank):
     category_descriptions = {
         "eco":       "Bal, daily, dépôts, give, rob...",
         "jeux":      "Slots, BJ, Jackpot, Fish, Work",
-        "speciaux":  "Enchères, Drop, Enquête",
+        "speciaux":  "Enchères, Drop",
         "admin":     "Gérer l'argent et l'XP des membres",
         "perms":     "Attribuer les rangs",
         "system":    "Configuration du bot",
@@ -1406,6 +1405,7 @@ async def _daily(ctx):
         update_economy(ctx.author.id, hand=eco["hand"] + amount, last_daily=now.isoformat())
     await add_xp(ctx, ctx.author.id, 50)
     desc = (
+        f"{ctx.author.mention} a récupéré son daily\n\n"
         f"🟡 **+{format_ryo(amount)}** en poche\n"
         f"✨ **+50 XP**"
     )
@@ -1430,6 +1430,7 @@ async def _dep(ctx, amount_str: str = None):
         new_hand = eco["hand"] - amount
         new_bank = eco["bank"] + amount
     desc = (
+        f"{ctx.author.mention} a déposé en banque\n\n"
         f"🏦 **+{format_ryo(amount)}** déposés\n"
         f"🟡 **{format_ryo(new_hand)}** en poche  ・  🏦 **{format_ryo(new_bank)}** en banque"
     )
@@ -1454,6 +1455,7 @@ async def _withdraw(ctx, amount_str: str = None):
         new_hand = eco["hand"] + amount
         new_bank = eco["bank"] - amount
     desc = (
+        f"{ctx.author.mention} a retiré de la banque\n\n"
         f"🟡 **+{format_ryo(amount)}** retirés\n"
         f"🟡 **{format_ryo(new_hand)}** en poche  ・  🏦 **{format_ryo(new_bank)}** en banque"
     )
@@ -1489,7 +1491,7 @@ async def _give(ctx, amount_str: str = None, *, user_input: str = None):
         if not atomic_transfer(ctx.author.id, target.id, amount):
             return await ctx.send(embed=error_embed("Erreur", "Le transfert a échoué, réessaie."))
     desc = (
-        f"➡️ {target.mention}\n"
+        f"{ctx.author.mention} a donné à {target.mention}\n\n"
         f"🟡 **{format_ryo(amount)}** transférés"
     )
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
@@ -1539,7 +1541,7 @@ async def _rob(ctx, *, user_input: str = None):
 
     await add_xp(ctx, ctx.author.id, 20)
     desc = (
-        f"🎯 Victime : {target.mention}\n"
+        f"{ctx.author.mention} a volé {target.mention} !\n\n"
         f"🥷 **{format_ryo(stolen)}** dérobés ({int(percent*100)}%)\n"
         f"✨ **+20 XP**"
     )
@@ -1578,8 +1580,8 @@ async def _fame(ctx, *, user_input: str = None):
         update_economy(target.id, fame=new_fame)
         update_economy(ctx.author.id, last_fame=now.isoformat())
     desc = (
-        f"➡️ {target.mention}\n"
-        f"⭐ **+1 fame**  ・  Total : **{new_fame}**"
+        f"{ctx.author.mention} a famé {target.mention}\n\n"
+        f"⭐ **+1 fame**  ・  Total : **{new_fame}** point{'s' if new_fame != 1 else ''} de fame"
     )
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
@@ -1620,8 +1622,8 @@ async def _work(ctx):
     await add_xp(ctx, ctx.author.id, 30)
 
     description = (
-        f"💼 **{job.capitalize()}**\n"
-        f"*{desc}*\n\n"
+        f"{ctx.author.mention} a travaillé comme **{job}**\n\n"
+        f"💼 *{desc}*\n\n"
         f"🟡 **+{format_ryo(amount)}** en poche\n"
         f"✨ **+30 XP**"
     )
@@ -2325,198 +2327,6 @@ async def _enchere(ctx, role: discord.Role = None):
     # Lance la gestion du cycle de vie en tâche de fond
     await run_enchere_lifecycle(view, channel, role)
 
-
-# ========================= ENQUÊTE =========================
-
-SCENARIOS = [
-    {
-        "crime": "vol d'une somme importante de Ryo dans la banque du serveur",
-        "lieux": ["la salle des coffres", "le couloir de surveillance", "le bureau du directeur"],
-        "indices_templates": [
-            "Un témoin a vu {suspect2} sortir précipitamment de {lieu} à 23h47.",
-            "Des traces de {suspect1} ont été retrouvées près de {lieu}.",
-            "La caméra de surveillance a filmé quelqu'un ressemblant à {coupable} entrer dans {lieu} avec une sacoche.",
-        ]
-    },
-    {
-        "crime": "disparition mystérieuse du cristal de puissance du serveur",
-        "lieux": ["la chambre secrète", "le laboratoire", "le jardin enchanté"],
-        "indices_templates": [
-            "{suspect1} a été vu en train de discuter avec {suspect2} la nuit du crime près de {lieu}.",
-            "Un message chiffré adressé à {coupable} a été trouvé dans {lieu}.",
-            "Des empreintes de {suspect2} ont été découvertes à {lieu}, mais elles menaient dans la mauvaise direction...",
-        ]
-    },
-    {
-        "crime": "sabotage du tournoi de jeux organisé sur le serveur",
-        "lieux": ["la salle d'arcade", "les coulisses", "la loge des joueurs"],
-        "indices_templates": [
-            "Un arbitre affirme avoir vu {suspect1} fouiller dans {lieu} avant le tournoi.",
-            "Le matériel saboteur retrouvé dans {lieu} porte les initiales de {coupable}.",
-            "{suspect2} prétend avoir un alibi mais des témoins le contredisent pour la période autour de {lieu}.",
-        ]
-    }
-]
-
-
-@bot.command(name="enquete")
-async def _enquete(ctx):
-    if not has_min_rank(ctx.author.id, 3):
-        return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
-
-    # Récupère des membres actifs
-    active = get_active_members(ctx.guild.id, limit=20)
-    active_members = []
-    for a in active:
-        m = ctx.guild.get_member(int(a["user_id"]))
-        if m and not m.bot and m.id != ctx.author.id:
-            active_members.append(m)
-
-    # Déduplique
-    seen = set()
-    unique_members = []
-    for m in active_members:
-        if m.id not in seen:
-            seen.add(m.id)
-            unique_members.append(m)
-
-    if len(unique_members) < 3:
-        return await ctx.send(embed=error_embed("❌ Pas assez de membres actifs", "Il faut au moins 3 membres actifs récents."))
-
-    # Choisit 3 à 5 personnes
-    count = random.randint(3, min(5, len(unique_members)))
-    chosen = random.sample(unique_members, count)
-    roles_list = ["coupable", "témoin", "complice", "victime", "suspect"]
-    random.shuffle(roles_list)
-
-    coupable = chosen[0]
-    scenario = random.choice(SCENARIOS)
-    lieu = random.choice(scenario["lieux"])
-
-    # Envoie les rôles en DM
-    role_assignments = {}
-    for i, member in enumerate(chosen):
-        role = roles_list[i] if i < len(roles_list) else "suspect"
-        role_assignments[member.id] = role
-        try:
-            role_descriptions = {
-                "coupable": "Tu es le **coupable**. Fais tout pour ne pas te faire démasquer.",
-                "victime":  "Tu es la **victime**. Tu peux témoigner mais certains indices te mettront en cause à tort.",
-                "témoin":   "Tu es **témoin**. Tu as vu des choses... mais tu n'es pas obligé de tout dire.",
-                "complice": "Tu es le **complice**. Aide le coupable sans te faire remarquer.",
-                "suspect":  "Tu es **suspect**. Tous les regards se tournent vers toi, mais tu es innocent.",
-            }
-            role_desc = role_descriptions.get(role, role_descriptions["suspect"])
-
-            em_dm = discord.Embed(
-                title="🕵️ Enquête — Rôle secret",
-                description=(
-                    f"Tu as été sélectionné dans l'enquête sur **{ctx.guild.name}**\n\n"
-                    f"🎭 Ton rôle : **{role.upper()}**\n\n"
-                    f"{role_desc}"
-                ),
-                color=embed_color(),
-            )
-            em_dm.set_footer(text="Velda ・ Enquête")
-            await member.send(embed=em_dm)
-        except discord.Forbidden:
-            log.info(f"Enquête : DM fermés pour {member} ({member.id})")
-        except discord.HTTPException as e:
-            log.warning(f"Enquête : échec DM à {member} : {e}")
-
-    # Construit les indices
-    suspect1 = chosen[1].display_name if len(chosen) > 1 else "Inconnu"
-    suspect2 = chosen[2].display_name if len(chosen) > 2 else "Inconnu"
-    indices = [t.format(
-        coupable=coupable.display_name,
-        suspect1=suspect1,
-        suspect2=suspect2,
-        lieu=lieu
-    ) for t in scenario["indices_templates"]]
-
-    # Lance l'enquête
-    participants_str = ", ".join([m.mention for m in chosen])
-    em = discord.Embed(
-        title="🕵️ Enquête ouverte",
-        description=(
-            f"🔎 **Crime :** {scenario['crime']}\n"
-            f"👥 **Personnes impliquées :** {participants_str}\n\n"
-            f"*Les rôles ont été envoyés en DM aux personnes concernées.*\n\n"
-            f"📋 3 indices vont être révélés progressivement\n"
-            f"💬 Pour désigner le coupable, tape son nom dans le chat"
-        ),
-        color=0x3498db,
-    )
-    em.set_footer(text="Velda ・ Enquête")
-    await ctx.send(embed=em)
-
-    # Révèle les indices progressivement
-    for i, indice in enumerate(indices):
-        await asyncio.sleep(30)
-        em_indice = discord.Embed(
-            title=f"🔍 Indice {i+1} / 3",
-            description=indice,
-            color=0x3498db,
-        )
-        em_indice.set_footer(text="Velda ・ Enquête")
-        await ctx.send(embed=em_indice)
-
-    await asyncio.sleep(20)
-
-    # Attente des réponses
-    em_guess = discord.Embed(
-        title="⏰ Dernière chance",
-        description="Tape le **nom du coupable** dans le chat\n⏳ Il reste **30 secondes**",
-        color=0xffa500,
-    )
-    em_guess.set_footer(text="Velda ・ Enquête")
-    await ctx.send(embed=em_guess)
-
-    correct_guessers = []
-
-    def check(m):
-        return (not m.author.bot and
-                m.channel == ctx.channel and
-                coupable.display_name.lower() in m.content.lower())
-
-    try:
-        while True:
-            msg = await bot.wait_for("message", check=check, timeout=30)
-            correct_guessers.append(msg.author)
-            if len(correct_guessers) >= 3:
-                break
-    except asyncio.TimeoutError:
-        pass
-
-    # Résultat
-    reward = 15000
-    if correct_guessers:
-        lines = [
-            f"🎭 Le coupable était {coupable.mention} *(rôle : {role_assignments[coupable.id]})*",
-            "",
-            f"🏆 **Détectives gagnants :**",
-        ]
-        for guesser in correct_guessers:
-            async with eco_lock:
-                atomic_hand_delta(guesser.id, reward, min_hand=0)
-            await add_xp(ctx, guesser.id, 100)
-            lines.append(f"• {guesser.mention}  ・  🟡 +{format_ryo(reward)}  ・  ✨ +100 XP")
-        color = 0x43b581
-    else:
-        lines = [
-            f"🎭 Le coupable était {coupable.mention} *(rôle : {role_assignments[coupable.id]})*",
-            "",
-            f"❌ Personne n'a trouvé le coupable à temps",
-        ]
-        color = 0xf04747
-
-    em_result = discord.Embed(
-        title="📋 Résultat de l'enquête",
-        description="\n".join(lines),
-        color=color,
-    )
-    em_result.set_footer(text="Velda ・ Enquête")
-    await ctx.send(embed=em_result)
 
 
 # ========================= ERROR HANDLING =========================
