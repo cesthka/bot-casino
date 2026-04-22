@@ -19,7 +19,7 @@ if not BOT_TOKEN:
     sys.exit(1)
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
-DEFAULT_BUYER_IDS = [1312375517927706630]
+DEFAULT_BUYER_IDS = [1312375517927706630, 1312375955737542676]
 DEFAULT_PREFIX = "*"
 MIN_BET = 100  # Mise minimum pour slots/jackpot/blackjack (évite le farm XP)
 ROB_COOLDOWN = 3600  # 1h de cooldown sur *rob
