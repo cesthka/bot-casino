@@ -375,6 +375,21 @@ def info_embed(title, desc=""):
     return em
 
 
+def action_embed(member, description, color=None):
+    """
+    Embed compact pour les actions de jeu / éco (daily, dep, rob, fame, work, fish, slots...).
+    Style : titre = display_name, description = lignes compactes avec emojis, thumbnail = avatar.
+    """
+    em = discord.Embed(
+        title=member.display_name,
+        description=description,
+        color=color if color is not None else embed_color(),
+    )
+    em.set_thumbnail(url=member.display_avatar.url)
+    em.set_footer(text="Velda")
+    return em
+
+
 def get_french_time():
     now = datetime.now(PARIS_TZ)
     JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -825,7 +840,7 @@ def build_home_embed(user_rank):
     """Embed d'accueil personnalisé : ne liste que les catégories accessibles au user."""
     p = get_prefix_cached()
     em = discord.Embed(color=embed_color())
-    em.set_author(name="Velda - Bot Casino")
+    em.set_author(name="Velda ─ Panel d'aide")
 
     rank_label = rank_name(user_rank)
     intro = (
@@ -1347,18 +1362,26 @@ async def _bal(ctx, *, user_input: str = None):
     xp_needed = xp_for_level(eco["level"] + 1) if eco["level"] < 100 else 0
     xp_progress = eco["xp"] - xp_for_level(eco["level"]) if eco["level"] > 0 else eco["xp"]
     xp_required = xp_needed - xp_for_level(eco["level"]) if eco["level"] > 0 else xp_needed
+    xp_display = f"{xp_progress} / {xp_required}" if eco["level"] < 100 else "MAX"
 
-    em = discord.Embed(title=f"💰 Balance — {target.display_name}", color=embed_color())
-    em.set_thumbnail(url=target.display_avatar.url)
-    em.add_field(name="👜 En main", value=format_ryo(eco["hand"]), inline=True)
-    em.add_field(name="🏦 En bank", value=format_ryo(eco["bank"]), inline=True)
-    em.add_field(name="⭐ Fame", value=str(eco["fame"]), inline=True)
-    em.add_field(name="🎯 Niveau", value=f"**{eco['level']}** / 100", inline=True)
-    em.add_field(name="✨ XP", value=f"{xp_progress} / {xp_required if eco['level'] < 100 else 'MAX'}", inline=True)
-    # Affiche l'escrow (argent bloqué dans les enchères actives) si > 0
+    lines = [
+        f"{target.mention} possède",
+        "",
+        f"🟡 **{format_ryo(eco['hand'])}** en poche",
+        f"🏦 **{format_ryo(eco['bank'])}** en banque",
+        f"⭐ **{eco['fame']}** point{'s' if eco['fame'] != 1 else ''} de fame",
+        f"🎯 Niveau **{eco['level']}** / 100  ・  ✨ XP {xp_display}",
+    ]
     if eco.get("escrow", 0) > 0:
-        em.add_field(name="🔒 En escrow", value=format_ryo(eco["escrow"]), inline=True)
-    em.set_footer(text=f"Velda ・ {get_french_time()}")
+        lines.append(f"🔒 **{format_ryo(eco['escrow'])}** en escrow (enchère)")
+
+    em = discord.Embed(
+        title=target.display_name,
+        description="\n".join(lines),
+        color=embed_color(),
+    )
+    em.set_thumbnail(url=target.display_avatar.url)
+    em.set_footer(text="Velda")
     await ctx.send(embed=em)
 
 
@@ -1382,7 +1405,12 @@ async def _daily(ctx):
         amount = random.randint(10000, 30000)
         update_economy(ctx.author.id, hand=eco["hand"] + amount, last_daily=now.isoformat())
     await add_xp(ctx, ctx.author.id, 50)
-    await ctx.send(embed=success_embed("✅ Daily récupéré !", f"+{format_ryo(amount)} en main !"))
+    desc = (
+        f"{ctx.author.mention} a récupéré son daily\n\n"
+        f"🟡 **+{format_ryo(amount)}** en poche\n"
+        f"✨ **+50 XP**"
+    )
+    await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
 @bot.command(name="dep")
@@ -1397,10 +1425,17 @@ async def _dep(ctx, amount_str: str = None):
         if amount is None or amount <= 0:
             return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide ou `all`."))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en poche."))
         if not atomic_hand_bank(ctx.author.id, -amount, +amount):
             return await ctx.send(embed=error_embed("Erreur", "Le dépôt a échoué, réessaie."))
-    await ctx.send(embed=success_embed("🏦 Dépôt effectué", f"+{format_ryo(amount)} déposés en bank."))
+        new_hand = eco["hand"] - amount
+        new_bank = eco["bank"] + amount
+    desc = (
+        f"{ctx.author.mention} a déposé en banque\n\n"
+        f"🏦 **+{format_ryo(amount)}** déposés\n"
+        f"🟡 **{format_ryo(new_hand)}** en poche  ・  🏦 **{format_ryo(new_bank)}** en banque"
+    )
+    await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
 @bot.command(name="withdraw", aliases=["with"])
@@ -1415,10 +1450,17 @@ async def _withdraw(ctx, amount_str: str = None):
         if amount is None or amount <= 0:
             return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide ou `all`."))
         if amount > eco["bank"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['bank'])} en bank."))
+            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['bank'])} en banque."))
         if not atomic_hand_bank(ctx.author.id, +amount, -amount):
             return await ctx.send(embed=error_embed("Erreur", "Le retrait a échoué, réessaie."))
-    await ctx.send(embed=success_embed("👜 Retrait effectué", f"+{format_ryo(amount)} retirés en main."))
+        new_hand = eco["hand"] + amount
+        new_bank = eco["bank"] - amount
+    desc = (
+        f"{ctx.author.mention} a retiré de la banque\n\n"
+        f"🟡 **+{format_ryo(amount)}** retirés\n"
+        f"🟡 **{format_ryo(new_hand)}** en poche  ・  🏦 **{format_ryo(new_bank)}** en banque"
+    )
+    await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
 @bot.command(name="give")
@@ -1445,11 +1487,15 @@ async def _give(ctx, amount_str: str = None, *, user_input: str = None):
         if amount is None or amount <= 0:
             return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide."))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en poche."))
         # FIX: transfert atomique (évite duplication/perte en cas de concurrence)
         if not atomic_transfer(ctx.author.id, target.id, amount):
             return await ctx.send(embed=error_embed("Erreur", "Le transfert a échoué, réessaie."))
-    await ctx.send(embed=success_embed("✅ Don effectué", f"{ctx.author.mention} a donné {format_ryo(amount)} à {target.mention}."))
+    desc = (
+        f"{ctx.author.mention} a donné à {target.mention}\n\n"
+        f"🟡 **{format_ryo(amount)}** transférés"
+    )
+    await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
 @bot.command(name="rob")
@@ -1495,7 +1541,12 @@ async def _rob(ctx, *, user_input: str = None):
         update_economy(ctx.author.id, last_rob=now.isoformat())
 
     await add_xp(ctx, ctx.author.id, 20)
-    await ctx.send(embed=success_embed("🥷 Vol réussi !", f"Tu as volé {format_ryo(stolen)} ({int(percent*100)}%) à {target.mention} !"))
+    desc = (
+        f"{ctx.author.mention} a volé {target.mention} !\n\n"
+        f"🥷 **{format_ryo(stolen)}** dérobés ({int(percent*100)}%)\n"
+        f"✨ **+20 XP**"
+    )
+    await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
 @bot.command(name="fame")
@@ -1526,9 +1577,15 @@ async def _fame(ctx, *, user_input: str = None):
                 return await ctx.send(embed=error_embed("⏰ Cooldown", f"Reviens dans **{h}h {m}min** pour famer."))
 
         eco_target = get_economy(target.id)
-        update_economy(target.id, fame=eco_target["fame"] + 1)
+        new_fame = eco_target["fame"] + 1
+        update_economy(target.id, fame=new_fame)
         update_economy(ctx.author.id, last_fame=now.isoformat())
-    await ctx.send(embed=success_embed("⭐ Fame !", f"{ctx.author.mention} a famé {target.mention} ! ({eco_target['fame'] + 1} fame)"))
+    desc = (
+        f"{ctx.author.mention} a famé {target.mention}\n\n"
+        f"⭐ **+1 fame** pour {target.mention}\n"
+        f"Total : **{new_fame}** point{'s' if new_fame != 1 else ''} de fame"
+    )
+    await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
 # ========================= JEUX =========================
@@ -1566,10 +1623,13 @@ async def _work(ctx):
         update_economy(ctx.author.id, hand=eco["hand"] + amount, last_work=now.isoformat())
     await add_xp(ctx, ctx.author.id, 30)
 
-    em = discord.Embed(title=f"💼 Boulot — {job.capitalize()}", color=embed_color())
-    em.description = f"{desc}\n\n**+{format_ryo(amount)}** gagnés !"
-    em.set_footer(text="Velda")
-    await ctx.send(embed=em)
+    description = (
+        f"{ctx.author.mention} a travaillé comme **{job}**\n\n"
+        f"{desc}\n\n"
+        f"🟡 **+{format_ryo(amount)}** en poche\n"
+        f"✨ **+30 XP**"
+    )
+    await ctx.send(embed=action_embed(ctx.author, description, color=0x43b581))
 
 
 @bot.command(name="fish")
@@ -1605,13 +1665,17 @@ async def _fish(ctx):
 
         update_economy(ctx.author.id, hand=eco["hand"] + amount, last_fish=now.isoformat())
     xp_gain = {"commun": 10, "peu commun": 20, "rare": 40, "épique": 70, "légendaire": 100, "déchet": 5}
-    await add_xp(ctx, ctx.author.id, xp_gain.get(rarity, 10))
+    xp_amount = xp_gain.get(rarity, 10)
+    await add_xp(ctx, ctx.author.id, xp_amount)
 
     rarity_colors = {"commun": 0x95a5a6, "peu commun": 0x2ecc71, "rare": 0x3498db, "épique": 0x9b59b6, "légendaire": 0xf1c40f, "déchet": 0x7f8c8d}
-    em = discord.Embed(title=f"🎣 Pêche — {rarity.upper()}", color=rarity_colors.get(rarity, embed_color()))
-    em.description = f"Tu as pêché un **{name}** !\n\n+**{format_ryo(amount)}** gagnés !"
-    em.set_footer(text="Velda")
-    await ctx.send(embed=em)
+    description = (
+        f"{ctx.author.mention} a pêché ! **({rarity.upper()})**\n\n"
+        f"🎣 {name}\n"
+        f"🟡 **+{format_ryo(amount)}** en poche\n"
+        f"✨ **+{xp_amount} XP**"
+    )
+    await ctx.send(embed=action_embed(ctx.author, description, color=rarity_colors.get(rarity, embed_color())))
 
 
 @bot.command(name="slots")
@@ -1640,27 +1704,30 @@ async def _slots(ctx, amount_str: str = None):
         if reels[0] == reels[1] == reels[2]:
             mult = multipliers.get(reels[0], 2)
             winnings = int(amount * mult)
-            result = f"JACKPOT ! x{mult} — +{format_ryo(winnings)}"
+            result = f"🎉 **JACKPOT x{mult}** ・ +{format_ryo(winnings)}"
             color = 0xffd700
             atomic_hand_delta(ctx.author.id, -amount + winnings, min_hand=0)
             xp_reward = 50
         elif reels[0] == reels[1] or reels[1] == reels[2]:
             winnings = int(amount * 1.5)
-            result = f"Deux identiques ! x1.5 — +{format_ryo(winnings)}"
+            result = f"✅ **Deux identiques x1.5** ・ +{format_ryo(winnings)}"
             color = 0x43b581
             atomic_hand_delta(ctx.author.id, -amount + winnings, min_hand=0)
             xp_reward = 15
         else:
-            result = f"Perdu — -{format_ryo(amount)}"
+            result = f"❌ **Perdu** ・ -{format_ryo(amount)}"
             color = 0xf04747
             atomic_hand_delta(ctx.author.id, -amount, min_hand=0)
             xp_reward = 5
 
     await add_xp(ctx, ctx.author.id, xp_reward)
-    em = discord.Embed(title="🎰 Machine à sous", color=color)
-    em.description = f"[ {reels[0]} | {reels[1]} | {reels[2]} ]\n\n{result}"
-    em.set_footer(text="Velda")
-    await ctx.send(embed=em)
+    description = (
+        f"{ctx.author.mention} a lancé les machines\n\n"
+        f"🎰 [ {reels[0]} | {reels[1]} | {reels[2]} ]\n\n"
+        f"{result}\n"
+        f"Mise : **{format_ryo(amount)}** ・ ✨ **+{xp_reward} XP**"
+    )
+    await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 @bot.command(name="jackpot")
@@ -1682,36 +1749,40 @@ async def _jackpot(ctx, amount_str: str = None):
         roll = random.randint(1, 100)
         if roll <= 2:
             mult = 50
-            result_text = f"🎊 **MEGA JACKPOT x50 !** (tirage : {roll}/100)"
+            result_line = f"🎊 **MEGA JACKPOT x50 !**"
             color = 0xffd700
         elif roll <= 10:
             mult = 10
-            result_text = f"🎉 **Jackpot x10 !** (tirage : {roll}/100)"
+            result_line = f"🎉 **Jackpot x10 !**"
             color = 0xf1c40f
         elif roll <= 30:
             mult = 2
-            result_text = f"✅ **Gain x2** (tirage : {roll}/100)"
+            result_line = f"✅ **Gain x2**"
             color = 0x43b581
         else:
             mult = 0
-            result_text = f"❌ **Perdu** (tirage : {roll}/100)"
+            result_line = f"❌ **Perdu**"
             color = 0xf04747
 
         if mult > 0:
             winnings = int(amount * mult)
             atomic_hand_delta(ctx.author.id, -amount + winnings, min_hand=0)
             xp_reward = mult * 10
-            result_text += f"\n\n+{format_ryo(winnings)} !"
+            gain_line = f"🟡 **+{format_ryo(winnings)}** gagnés"
         else:
             atomic_hand_delta(ctx.author.id, -amount, min_hand=0)
             xp_reward = 5
-            result_text += f"\n\n-{format_ryo(amount)}"
+            gain_line = f"🟡 **-{format_ryo(amount)}** perdus"
 
     await add_xp(ctx, ctx.author.id, xp_reward)
-    em = discord.Embed(title="🎲 Jackpot", color=color)
-    em.description = result_text
-    em.set_footer(text="Velda")
-    await ctx.send(embed=em)
+    description = (
+        f"{ctx.author.mention} a lancé le jackpot\n\n"
+        f"🎲 Tirage : **{roll} / 100**\n"
+        f"{result_line}\n\n"
+        f"{gain_line}\n"
+        f"Mise : **{format_ryo(amount)}** ・ ✨ **+{xp_reward} XP**"
+    )
+    await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 # ========================= BLACKJACK =========================
@@ -1751,12 +1822,25 @@ class BlackjackView(discord.ui.View):
     def make_embed(self, result=None, color=None):
         pv = self.hand_value(self.player_hand)
         dv = self.hand_value(self.dealer_hand)
-        em = discord.Embed(title="🃏 Blackjack", color=color or embed_color())
-        em.add_field(name=f"Dealer ({dv if result else '?'})", value=self.format_hand(self.dealer_hand, hide_second=not result), inline=False)
-        em.add_field(name=f"Toi ({pv})", value=self.format_hand(self.player_hand), inline=False)
+        dealer_display = self.format_hand(self.dealer_hand, hide_second=not result)
+        player_display = self.format_hand(self.player_hand)
+
+        description = (
+            f"{self.ctx.author.mention} joue au Blackjack\n\n"
+            f"🎩 **Dealer ({dv if result else '?'})** ・ {dealer_display}\n"
+            f"🃏 **Toi ({pv})** ・ {player_display}\n"
+        )
         if result:
-            em.add_field(name="Résultat", value=result, inline=False)
-        em.set_footer(text=f"Mise : {format_ryo(self.amount)} ・ Velda")
+            description += f"\n{result}"
+        description += f"\n\nMise : **{format_ryo(self.amount)}**"
+
+        em = discord.Embed(
+            title=self.ctx.author.display_name,
+            description=description,
+            color=color if color is not None else embed_color(),
+        )
+        em.set_thumbnail(url=self.ctx.author.display_avatar.url)
+        em.set_footer(text="Velda")
         return em
 
     async def on_timeout(self):
@@ -1881,10 +1965,11 @@ async def _bj(ctx, amount_str: str = None):
 # ========================= DROP =========================
 
 class DropView(discord.ui.View):
-    def __init__(self, amount, author_id, message=None):
+    def __init__(self, amount, author_id, author_member=None, message=None):
         super().__init__(timeout=120)
         self.amount = amount
         self.author_id = author_id
+        self.author_member = author_member
         self.claimed = False
         self.button_active = False
         self.message = message
@@ -1899,11 +1984,16 @@ class DropView(discord.ui.View):
             item.style = discord.ButtonStyle.secondary
         try:
             if self.message:
-                await self.message.edit(embed=discord.Embed(
+                em = discord.Embed(
                     title="💸 Drop expiré",
-                    description=f"Personne n'a réclamé les **{format_ryo(self.amount)}**...",
-                    color=0xf04747
-                ), view=self)
+                    description=(
+                        f"Personne n'a réclamé les **{format_ryo(self.amount)}**...\n\n"
+                        f"❌ Les fonds sont perdus"
+                    ),
+                    color=0xf04747,
+                )
+                em.set_footer(text="Velda")
+                await self.message.edit(embed=em, view=self)
         except discord.HTTPException:
             pass
 
@@ -1930,12 +2020,39 @@ class DropView(discord.ui.View):
         button.disabled = True
         button.label = f"✅ Réclamé par {interaction.user.display_name}"
         button.style = discord.ButtonStyle.success
-        await interaction.response.edit_message(embed=discord.Embed(
-            title="💸 Drop réclamé !",
-            description=f"{interaction.user.mention} a réclamé **{format_ryo(self.amount)}** !",
-            color=0x43b581
-        ), view=self)
+
+        em = discord.Embed(
+            title=interaction.user.display_name,
+            description=(
+                f"{interaction.user.mention} a réclamé le drop !\n\n"
+                f"💸 **+{format_ryo(self.amount)}** en poche"
+            ),
+            color=0x43b581,
+        )
+        em.set_thumbnail(url=interaction.user.display_avatar.url)
+        em.set_footer(text="Velda")
+        await interaction.response.edit_message(embed=em, view=self)
         self.stop()
+
+
+def _drop_embed(amount, author_name, stage):
+    """Construit l'embed du drop selon le stage (countdown/active). Style unifié."""
+    em = discord.Embed(title="💸 DROP !", color=0xffd700)
+    if stage == "active":
+        em.description = (
+            f"💰 **{format_ryo(amount)}** en jeu\n\n"
+            f"🎯 **GO ! Clique maintenant !**\n"
+            f"🏆 Le premier remporte tout"
+        )
+    else:
+        # stage est un int = secondes restantes
+        em.description = (
+            f"💰 **{format_ryo(amount)}** en jeu\n\n"
+            f"⏳ Bouton actif dans **{stage} seconde{'s' if stage > 1 else ''}**...\n"
+            f"🏆 Le premier remporte tout"
+        )
+    em.set_footer(text=f"Lancé par {author_name} ・ Velda")
+    return em
 
 
 @bot.command(name="drop")
@@ -1952,28 +2069,14 @@ async def _drop(ctx, amount_str: str = None):
     except ValueError:
         return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide."))
 
-    view = DropView(amount, ctx.author.id)
-
-    em = discord.Embed(title="💸 DROP !", color=0xffd700)
-    em.description = (
-        f"**{format_ryo(amount)}** sont en jeu !\n\n"
-        f"⏳ Le bouton s'active dans **10 secondes**...\n"
-        f"🏆 Le premier à cliquer remporte tout !"
-    )
-    em.set_footer(text=f"Drop lancé par {ctx.author.display_name} ・ Velda")
-
-    msg = await ctx.send(embed=em, view=view)
+    view = DropView(amount, ctx.author.id, author_member=ctx.author)
+    msg = await ctx.send(embed=_drop_embed(amount, ctx.author.display_name, 10), view=view)
     view.message = msg
 
     # Countdown
     for i in range(10, 0, -1):
-        em.description = (
-            f"**{format_ryo(amount)}** sont en jeu !\n\n"
-            f"⏳ Le bouton s'active dans **{i} seconde{'s' if i > 1 else ''}**...\n"
-            f"🏆 Le premier à cliquer remporte tout !"
-        )
         try:
-            await msg.edit(embed=em)
+            await msg.edit(embed=_drop_embed(amount, ctx.author.display_name, i))
         except discord.HTTPException:
             pass
         await asyncio.sleep(1)
@@ -1985,13 +2088,8 @@ async def _drop(ctx, amount_str: str = None):
         item.label = "🎯 CLIQUER !"
         item.style = discord.ButtonStyle.danger
 
-    em.description = (
-        f"**{format_ryo(amount)}** sont en jeu !\n\n"
-        f"🎯 **GO ! Clique maintenant !**\n"
-        f"🏆 Le premier remporte tout !"
-    )
     try:
-        await msg.edit(embed=em, view=view)
+        await msg.edit(embed=_drop_embed(amount, ctx.author.display_name, "active"), view=view)
     except discord.HTTPException:
         pass
 
@@ -2031,22 +2129,30 @@ class EnchereView(discord.ui.View):
 
     def make_embed(self):
         end_ts = int(self.end_time.timestamp())
-        em = discord.Embed(title=f"🎪 Enchère — @{self.role.name}", color=0xffd700)
         if self.current_winner:
-            em.description = (
-                f"**Mise actuelle :** {format_ryo(self.current_bid)}\n"
-                f"**Meilleur enchérisseur :** {self.current_winner.mention}\n"
-                f"**Fin :** <t:{end_ts}:R>\n"
-                f"**Prix :** Le rôle {self.role.mention} pour **48h** !\n\n"
-                f"Clique sur **Enchérir** pour surenchérir ! (min : {format_ryo(self.min_next_bid())})"
+            description = (
+                f"🎪 Enchère en cours pour {self.role.mention}\n\n"
+                f"💰 Mise actuelle : **{format_ryo(self.current_bid)}**\n"
+                f"🏆 Meilleur enchérisseur : {self.current_winner.mention}\n"
+                f"⏰ Fin : <t:{end_ts}:R>\n"
+                f"🎁 Récompense : le rôle pour **48h**\n\n"
+                f"Mise minimum : **{format_ryo(self.min_next_bid())}**"
             )
+            color = 0xffd700
         else:
-            em.description = (
-                f"**Mise de départ :** {format_ryo(self.current_bid)}\n"
-                f"**Fin :** <t:{end_ts}:R>\n"
-                f"**Prix :** Le rôle {self.role.mention} pour **48h** !\n\n"
-                f"Clique sur **Enchérir** pour participer !"
+            description = (
+                f"🎪 Nouvelle enchère pour {self.role.mention}\n\n"
+                f"💰 Mise de départ : **{format_ryo(self.current_bid)}**\n"
+                f"⏰ Fin : <t:{end_ts}:R>\n"
+                f"🎁 Récompense : le rôle pour **48h**\n\n"
+                f"Clique sur **Enchérir** pour participer"
             )
+            color = 0xffd700
+        em = discord.Embed(
+            title=f"Enchère — @{self.role.name}",
+            description=description,
+            color=color,
+        )
         em.set_footer(text=f"Lancé par {self.author.display_name} ・ Velda")
         return em
 
@@ -2160,12 +2266,17 @@ async def run_enchere_lifecycle(view: EnchereView, channel, role):
         except (discord.Forbidden, discord.HTTPException) as e:
             log.warning(f"Impossible d'attribuer le rôle {role.name} : {e}")
 
-        em_end = discord.Embed(title=f"🏆 Enchère terminée — @{role.name}", color=0x43b581)
-        em_end.description = (
-            f"**Gagnant :** {view.current_winner.mention}\n"
-            f"**Mise finale :** {format_ryo(view.current_bid)}\n"
-            f"Le rôle est attribué pour **48h** !"
+        em_end = discord.Embed(
+            title=view.current_winner.display_name,
+            description=(
+                f"{view.current_winner.mention} a remporté l'enchère !\n\n"
+                f"🏆 Rôle obtenu : {role.mention}\n"
+                f"💰 Mise finale : **{format_ryo(view.current_bid)}**\n"
+                f"⏳ Durée : **48h**"
+            ),
+            color=0x43b581,
         )
+        em_end.set_thumbnail(url=view.current_winner.display_avatar.url)
         em_end.set_footer(text="Velda")
         try:
             await channel.send(embed=em_end)
@@ -2179,7 +2290,14 @@ async def run_enchere_lifecycle(view: EnchereView, channel, role):
         except (discord.Forbidden, discord.HTTPException) as e:
             log.warning(f"Impossible de retirer le rôle {role.name} : {e}")
     else:
-        em_end = discord.Embed(title=f"❌ Enchère terminée — Aucun participant", color=0xf04747)
+        em_end = discord.Embed(
+            title="Enchère terminée",
+            description=(
+                f"❌ Aucun participant pour {role.mention}\n\n"
+                f"L'enchère est close sans gagnant"
+            ),
+            color=0xf04747,
+        )
         em_end.set_footer(text="Velda")
         try:
             await channel.send(embed=em_end)
@@ -2289,21 +2407,24 @@ async def _enquete(ctx):
         role = roles_list[i] if i < len(roles_list) else "suspect"
         role_assignments[member.id] = role
         try:
-            em_dm = discord.Embed(title="🕵️ Enquête — Ton rôle secret", color=embed_color())
-            em_dm.description = (
-                f"Tu as été sélectionné dans l'enquête sur **{ctx.guild.name}** !\n\n"
-                f"**Ton rôle : {role.upper()}**\n\n"
+            role_descriptions = {
+                "coupable": "Tu es le **coupable**. Fais tout pour ne pas te faire démasquer.",
+                "victime":  "Tu es la **victime**. Tu peux témoigner mais certains indices te mettront en cause à tort.",
+                "témoin":   "Tu es **témoin**. Tu as vu des choses... mais tu n'es pas obligé de tout dire.",
+                "complice": "Tu es le **complice**. Aide le coupable sans te faire remarquer.",
+                "suspect":  "Tu es **suspect**. Tous les regards se tournent vers toi, mais tu es innocent.",
+            }
+            role_desc = role_descriptions.get(role, role_descriptions["suspect"])
+
+            em_dm = discord.Embed(
+                title="🕵️ Enquête — Rôle secret",
+                description=(
+                    f"Tu as été sélectionné dans l'enquête sur **{ctx.guild.name}**\n\n"
+                    f"🎭 Ton rôle : **{role.upper()}**\n\n"
+                    f"{role_desc}"
+                ),
+                color=embed_color(),
             )
-            if role == "coupable":
-                em_dm.description += "Tu es le **coupable**. Fais tout pour ne pas te faire démasquer !"
-            elif role == "victime":
-                em_dm.description += "Tu es la **victime**. Tu peux témoigner mais certains indices te mettront en cause à tort."
-            elif role == "témoin":
-                em_dm.description += "Tu es **témoin**. Tu as vu des choses... mais tu n'es pas obligé de tout dire."
-            elif role == "complice":
-                em_dm.description += "Tu es le **complice**. Aide le coupable sans te faire remarquer."
-            else:
-                em_dm.description += "Tu es **suspect**. Tous les regards se tournent vers toi, mais tu es innocent."
             em_dm.set_footer(text="Velda ・ Enquête")
             await member.send(embed=em_dm)
         except discord.Forbidden:
@@ -2323,13 +2444,16 @@ async def _enquete(ctx):
 
     # Lance l'enquête
     participants_str = ", ".join([m.mention for m in chosen])
-    em = discord.Embed(title="🕵️ ENQUÊTE OUVERTE", color=0x3498db)
-    em.description = (
-        f"**Crime :** {scenario['crime']}\n\n"
-        f"**Personnes impliquées :** {participants_str}\n\n"
-        f"*Les rôles ont été envoyés en DM aux personnes concernées.*\n\n"
-        f"**3 indices vont être révélés progressivement...**\n"
-        f"Pour désigner le coupable : tapez le nom du suspect dans le chat !"
+    em = discord.Embed(
+        title="🕵️ Enquête ouverte",
+        description=(
+            f"🔎 **Crime :** {scenario['crime']}\n"
+            f"👥 **Personnes impliquées :** {participants_str}\n\n"
+            f"*Les rôles ont été envoyés en DM aux personnes concernées.*\n\n"
+            f"📋 3 indices vont être révélés progressivement\n"
+            f"💬 Pour désigner le coupable, tape son nom dans le chat"
+        ),
+        color=0x3498db,
     )
     em.set_footer(text="Velda ・ Enquête")
     await ctx.send(embed=em)
@@ -2337,16 +2461,22 @@ async def _enquete(ctx):
     # Révèle les indices progressivement
     for i, indice in enumerate(indices):
         await asyncio.sleep(30)
-        em_indice = discord.Embed(title=f"🔍 Indice {i+1}/3", color=0x3498db)
-        em_indice.description = indice
+        em_indice = discord.Embed(
+            title=f"🔍 Indice {i+1} / 3",
+            description=indice,
+            color=0x3498db,
+        )
         em_indice.set_footer(text="Velda ・ Enquête")
         await ctx.send(embed=em_indice)
 
     await asyncio.sleep(20)
 
     # Attente des réponses
-    em_guess = discord.Embed(title="⏰ Dernière chance !", color=0xffa500)
-    em_guess.description = "Tapez le **nom du coupable** dans le chat ! Vous avez 30 secondes !"
+    em_guess = discord.Embed(
+        title="⏰ Dernière chance",
+        description="Tape le **nom du coupable** dans le chat\n⏳ Il reste **30 secondes**",
+        color=0xffa500,
+    )
     em_guess.set_footer(text="Velda ・ Enquête")
     await ctx.send(embed=em_guess)
 
@@ -2368,19 +2498,31 @@ async def _enquete(ctx):
 
     # Résultat
     reward = 15000
-    em_result = discord.Embed(title="📋 Résultat de l'enquête", color=0x43b581 if correct_guessers else 0xf04747)
-    em_result.description = f"**Le coupable était : {coupable.mention} ({role_assignments[coupable.id]})**\n\n"
-
     if correct_guessers:
-        em_result.description += f"**🏆 Détectives gagnants :**\n"
+        lines = [
+            f"🎭 Le coupable était {coupable.mention} *(rôle : {role_assignments[coupable.id]})*",
+            "",
+            f"🏆 **Détectives gagnants :**",
+        ]
         for guesser in correct_guessers:
-            eco = get_economy(guesser.id)
-            update_economy(guesser.id, hand=eco["hand"] + reward)
+            async with eco_lock:
+                atomic_hand_delta(guesser.id, reward, min_hand=0)
             await add_xp(ctx, guesser.id, 100)
-            em_result.description += f"{guesser.mention} +{format_ryo(reward)}\n"
+            lines.append(f"• {guesser.mention}  ・  🟡 +{format_ryo(reward)}  ・  ✨ +100 XP")
+        color = 0x43b581
     else:
-        em_result.description += "Personne n'a trouvé le coupable à temps !"
+        lines = [
+            f"🎭 Le coupable était {coupable.mention} *(rôle : {role_assignments[coupable.id]})*",
+            "",
+            f"❌ Personne n'a trouvé le coupable à temps",
+        ]
+        color = 0xf04747
 
+    em_result = discord.Embed(
+        title="📋 Résultat de l'enquête",
+        description="\n".join(lines),
+        color=color,
+    )
     em_result.set_footer(text="Velda ・ Enquête")
     await ctx.send(embed=em_result)
 
