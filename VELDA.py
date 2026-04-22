@@ -1406,7 +1406,6 @@ async def _daily(ctx):
         update_economy(ctx.author.id, hand=eco["hand"] + amount, last_daily=now.isoformat())
     await add_xp(ctx, ctx.author.id, 50)
     desc = (
-        f"{ctx.author.mention} a récupéré son daily\n\n"
         f"🟡 **+{format_ryo(amount)}** en poche\n"
         f"✨ **+50 XP**"
     )
@@ -1431,7 +1430,6 @@ async def _dep(ctx, amount_str: str = None):
         new_hand = eco["hand"] - amount
         new_bank = eco["bank"] + amount
     desc = (
-        f"{ctx.author.mention} a déposé en banque\n\n"
         f"🏦 **+{format_ryo(amount)}** déposés\n"
         f"🟡 **{format_ryo(new_hand)}** en poche  ・  🏦 **{format_ryo(new_bank)}** en banque"
     )
@@ -1456,7 +1454,6 @@ async def _withdraw(ctx, amount_str: str = None):
         new_hand = eco["hand"] + amount
         new_bank = eco["bank"] - amount
     desc = (
-        f"{ctx.author.mention} a retiré de la banque\n\n"
         f"🟡 **+{format_ryo(amount)}** retirés\n"
         f"🟡 **{format_ryo(new_hand)}** en poche  ・  🏦 **{format_ryo(new_bank)}** en banque"
     )
@@ -1492,7 +1489,7 @@ async def _give(ctx, amount_str: str = None, *, user_input: str = None):
         if not atomic_transfer(ctx.author.id, target.id, amount):
             return await ctx.send(embed=error_embed("Erreur", "Le transfert a échoué, réessaie."))
     desc = (
-        f"{ctx.author.mention} a donné à {target.mention}\n\n"
+        f"➡️ {target.mention}\n"
         f"🟡 **{format_ryo(amount)}** transférés"
     )
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
@@ -1542,7 +1539,7 @@ async def _rob(ctx, *, user_input: str = None):
 
     await add_xp(ctx, ctx.author.id, 20)
     desc = (
-        f"{ctx.author.mention} a volé {target.mention} !\n\n"
+        f"🎯 Victime : {target.mention}\n"
         f"🥷 **{format_ryo(stolen)}** dérobés ({int(percent*100)}%)\n"
         f"✨ **+20 XP**"
     )
@@ -1581,9 +1578,8 @@ async def _fame(ctx, *, user_input: str = None):
         update_economy(target.id, fame=new_fame)
         update_economy(ctx.author.id, last_fame=now.isoformat())
     desc = (
-        f"{ctx.author.mention} a famé {target.mention}\n\n"
-        f"⭐ **+1 fame** pour {target.mention}\n"
-        f"Total : **{new_fame}** point{'s' if new_fame != 1 else ''} de fame"
+        f"➡️ {target.mention}\n"
+        f"⭐ **+1 fame**  ・  Total : **{new_fame}**"
     )
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
@@ -1624,8 +1620,8 @@ async def _work(ctx):
     await add_xp(ctx, ctx.author.id, 30)
 
     description = (
-        f"{ctx.author.mention} a travaillé comme **{job}**\n\n"
-        f"{desc}\n\n"
+        f"💼 **{job.capitalize()}**\n"
+        f"*{desc}*\n\n"
         f"🟡 **+{format_ryo(amount)}** en poche\n"
         f"✨ **+30 XP**"
     )
@@ -1670,8 +1666,7 @@ async def _fish(ctx):
 
     rarity_colors = {"commun": 0x95a5a6, "peu commun": 0x2ecc71, "rare": 0x3498db, "épique": 0x9b59b6, "légendaire": 0xf1c40f, "déchet": 0x7f8c8d}
     description = (
-        f"{ctx.author.mention} a pêché ! **({rarity.upper()})**\n\n"
-        f"🎣 {name}\n"
+        f"🎣 {name} *({rarity})*\n"
         f"🟡 **+{format_ryo(amount)}** en poche\n"
         f"✨ **+{xp_amount} XP**"
     )
@@ -1722,10 +1717,9 @@ async def _slots(ctx, amount_str: str = None):
 
     await add_xp(ctx, ctx.author.id, xp_reward)
     description = (
-        f"{ctx.author.mention} a lancé les machines\n\n"
         f"🎰 [ {reels[0]} | {reels[1]} | {reels[2]} ]\n\n"
         f"{result}\n"
-        f"Mise : **{format_ryo(amount)}** ・ ✨ **+{xp_reward} XP**"
+        f"Mise : **{format_ryo(amount)}**  ・  ✨ **+{xp_reward} XP**"
     )
     await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
@@ -1776,11 +1770,10 @@ async def _jackpot(ctx, amount_str: str = None):
 
     await add_xp(ctx, ctx.author.id, xp_reward)
     description = (
-        f"{ctx.author.mention} a lancé le jackpot\n\n"
         f"🎲 Tirage : **{roll} / 100**\n"
         f"{result_line}\n\n"
         f"{gain_line}\n"
-        f"Mise : **{format_ryo(amount)}** ・ ✨ **+{xp_reward} XP**"
+        f"Mise : **{format_ryo(amount)}**  ・  ✨ **+{xp_reward} XP**"
     )
     await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
@@ -1826,7 +1819,6 @@ class BlackjackView(discord.ui.View):
         player_display = self.format_hand(self.player_hand)
 
         description = (
-            f"{self.ctx.author.mention} joue au Blackjack\n\n"
             f"🎩 **Dealer ({dv if result else '?'})** ・ {dealer_display}\n"
             f"🃏 **Toi ({pv})** ・ {player_display}\n"
         )
