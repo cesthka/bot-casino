@@ -111,6 +111,15 @@ def init_db():
         PRIMARY KEY (guild_id, user_id)
     )""")
 
+    # Salons où le bot est autorisé par guild (les non-Sys ne peuvent utiliser le bot que là)
+    c.execute("""CREATE TABLE IF NOT EXISTS allowed_channels (
+        guild_id TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        added_by TEXT,
+        added_at TEXT,
+        PRIMARY KEY (guild_id, channel_id)
+    )""")
+
     # Migration de l'ancienne table si elle existait avec le mauvais schéma
     try:
         info = c.execute("PRAGMA table_info(active_messages)").fetchall()
@@ -264,6 +273,51 @@ def set_enchere_channel(guild_id, channel_id):
     conn.execute("INSERT OR REPLACE INTO enchere_channels VALUES (?, ?)", (str(guild_id), str(channel_id)))
     conn.commit()
     conn.close()
+
+
+# ---- Allowed channels (Sys+ bypass, les autres sont restreints à ces salons) ----
+
+def add_allowed_channel(guild_id, channel_id, added_by):
+    conn = get_db()
+    now = datetime.now(PARIS_TZ).isoformat()
+    conn.execute(
+        "INSERT OR IGNORE INTO allowed_channels (guild_id, channel_id, added_by, added_at) VALUES (?, ?, ?, ?)",
+        (str(guild_id), str(channel_id), str(added_by), now)
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_allowed_channel(guild_id, channel_id):
+    conn = get_db()
+    cur = conn.execute(
+        "DELETE FROM allowed_channels WHERE guild_id = ? AND channel_id = ?",
+        (str(guild_id), str(channel_id))
+    )
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted > 0
+
+
+def get_allowed_channels(guild_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT channel_id FROM allowed_channels WHERE guild_id = ?",
+        (str(guild_id),)
+    ).fetchall()
+    conn.close()
+    return [r["channel_id"] for r in rows]
+
+
+def is_channel_allowed(guild_id, channel_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT 1 FROM allowed_channels WHERE guild_id = ? AND channel_id = ? LIMIT 1",
+        (str(guild_id), str(channel_id))
+    ).fetchone()
+    conn.close()
+    return row is not None
 
 
 def track_message(guild_id, user_id, content):
@@ -488,6 +542,33 @@ def get_prefix(bot, message):
 bot = commands.Bot(command_prefix=get_prefix, intents=intents, help_command=None)
 
 
+# ========================= GLOBAL CHANNEL CHECK =========================
+
+class ChannelNotAllowedError(commands.CheckFailure):
+    """Levée quand un membre non-Sys utilise une commande dans un salon non autorisé."""
+    pass
+
+
+@bot.check
+async def check_allowed_channel(ctx):
+    """
+    Check global : les Sys+ bypassent, les autres ne peuvent utiliser le bot que
+    dans les salons explicitement autorisés via *allow.
+    Les DMs sont toujours autorisés (pas de salon à filtrer).
+    """
+    # Sys+ bypass total
+    if has_min_rank(ctx.author.id, 3):
+        return True
+    # DM : pas de guild, on laisse passer
+    if ctx.guild is None:
+        return True
+    # Salon autorisé ?
+    if is_channel_allowed(ctx.guild.id, ctx.channel.id):
+        return True
+    # Sinon : bloque silencieusement (une réaction ❌ sera ajoutée via on_command_error)
+    raise ChannelNotAllowedError("Salon non autorisé pour Velda.")
+
+
 # ========================= EVENTS =========================
 
 @bot.event
@@ -600,9 +681,12 @@ HELP_CATEGORIES = {
         "label": "Système",
         "title": "⚙️  Système",
         "items": [
-            ("setenchere #salon", "Définir le salon des enchères", 3),
-            ("setlog #salon",     "Définir le salon des logs",     4),
-            ("prefix [nouveau]",  "Changer le prefix",             4),
+            ("allow #salon",      "Autoriser un salon pour le bot", 3),
+            ("unallow #salon",    "Retirer un salon autorisé",      3),
+            ("allow",             "Lister les salons autorisés",    3),
+            ("setenchere #salon", "Définir le salon des enchères",  3),
+            ("setlog #salon",     "Définir le salon des logs",      4),
+            ("prefix [nouveau]",  "Changer le prefix",              4),
         ],
     },
     "hierarchy": {
@@ -659,7 +743,7 @@ def build_hierarchy_embed(user_rank):
     # On affiche chaque niveau, mais on marque celui du user
     levels = [
         (4, "👑 **Buyer**",     "Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`"),
-        (3, "🔧 **Sys**",       "`*enquete`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
+        (3, "🔧 **Sys**",       "`*allow`/`*unallow`, `*enquete`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
         (2, "⭐ **Owner**",      "`*enchere`, `*drop`, `*wl`/`*unwl`"),
         (1, "✨ **Whitelist**",  "Statut privilégié"),
         (0, "👤 **Tout le monde**", "Jeux et commandes éco"),
@@ -800,6 +884,123 @@ async def _setenchere(ctx, channel: discord.TextChannel = None):
         return await ctx.send(embed=error_embed("Argument manquant", "Mentionne un salon."))
     set_enchere_channel(ctx.guild.id, channel.id)
     await ctx.send(embed=success_embed("✅ Salon enchères configuré", f"Enchères dans {channel.mention}."))
+
+
+# ========================= ALLOWED CHANNELS =========================
+
+async def _resolve_channel(ctx, channel_input):
+    """Résout un salon depuis une mention #salon, un ID, ou un nom. Retourne (channel, raw_id)."""
+    clean = channel_input.strip("<#>")
+    # Tentative ID direct
+    try:
+        cid = int(clean)
+        ch = ctx.guild.get_channel(cid)
+        return ch, cid
+    except ValueError:
+        pass
+    # Tentative via converter
+    try:
+        ch = await commands.TextChannelConverter().convert(ctx, channel_input)
+        return ch, ch.id
+    except commands.CommandError:
+        return None, None
+
+
+@bot.command(name="allow")
+async def _allow(ctx, *, channel_input: str = None):
+    if not has_min_rank(ctx.author.id, 3):
+        return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
+
+    # Sans argument : liste les salons autorisés
+    if channel_input is None:
+        allowed = get_allowed_channels(ctx.guild.id)
+        if not allowed:
+            return await ctx.send(embed=info_embed(
+                "📋 Aucun salon autorisé",
+                "Personne ne peut utiliser le bot en dehors des **Sys+**.\n"
+                f"Utilise `{get_prefix_cached()}allow #salon` pour en ajouter un."
+            ))
+        lines = []
+        for cid in allowed:
+            channel = ctx.guild.get_channel(int(cid))
+            if channel:
+                lines.append(f"• {channel.mention} (`{cid}`)")
+            else:
+                lines.append(f"• *Salon supprimé ou inaccessible* (`{cid}`)")
+        return await ctx.send(embed=info_embed(
+            f"📋 Salons autorisés ({len(allowed)})",
+            "\n".join(lines)
+        ))
+
+    channel, raw_id = await _resolve_channel(ctx, channel_input)
+    if not channel:
+        return await ctx.send(embed=error_embed(
+            "❌ Salon introuvable",
+            "Mentionne un salon (`#salon`) ou donne son ID."
+        ))
+
+    if is_channel_allowed(ctx.guild.id, channel.id):
+        return await ctx.send(embed=error_embed(
+            "Déjà autorisé",
+            f"{channel.mention} est déjà dans la liste des salons autorisés."
+        ))
+
+    add_allowed_channel(ctx.guild.id, channel.id, ctx.author.id)
+    await ctx.send(embed=success_embed(
+        "✅ Salon autorisé",
+        f"{channel.mention} est maintenant un salon autorisé pour Velda."
+    ))
+    await send_log(
+        ctx.guild, "Salon autorisé", ctx.author,
+        desc=f"Salon : {channel.mention} (`{channel.id}`)",
+        color=0x43b581
+    )
+
+
+@bot.command(name="unallow")
+async def _unallow(ctx, *, channel_input: str = None):
+    if not has_min_rank(ctx.author.id, 3):
+        return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis."))
+    if not channel_input:
+        return await ctx.send(embed=error_embed(
+            "Argument manquant",
+            f"Usage : `{get_prefix_cached()}unallow #salon` ou `{get_prefix_cached()}unallow [id]`"
+        ))
+
+    channel, raw_id = await _resolve_channel(ctx, channel_input)
+
+    # Même si le salon n'existe plus (supprimé), on permet de nettoyer la DB via son ID
+    if not channel:
+        if raw_id is not None:
+            if remove_allowed_channel(ctx.guild.id, raw_id):
+                return await ctx.send(embed=success_embed(
+                    "✅ Salon retiré",
+                    f"Salon `{raw_id}` retiré de la liste (salon supprimé ou inaccessible)."
+                ))
+            return await ctx.send(embed=error_embed(
+                "Pas dans la liste",
+                f"Le salon `{raw_id}` n'est pas dans la liste des salons autorisés."
+            ))
+        return await ctx.send(embed=error_embed(
+            "❌ Salon introuvable",
+            "Mentionne un salon ou donne son ID."
+        ))
+
+    if not remove_allowed_channel(ctx.guild.id, channel.id):
+        return await ctx.send(embed=error_embed(
+            "Pas dans la liste",
+            f"{channel.mention} n'est pas dans la liste des salons autorisés."
+        ))
+
+    await ctx.send(embed=success_embed(
+        "✅ Salon retiré",
+        f"{channel.mention} n'est plus un salon autorisé."
+    ))
+    await send_log(
+        ctx.guild, "Salon retiré", ctx.author,
+        desc=f"Salon : {channel.mention} (`{channel.id}`)",
+        color=0xf04747
+    )
 
 
 # ========================= RANGS =========================
@@ -2033,6 +2234,14 @@ async def on_command_error(ctx, error):
     # Unwrap les CommandInvokeError
     if isinstance(error, commands.CommandInvokeError):
         error = error.original
+
+    # FIX: salon non autorisé → réaction ❌ discrète, pas de message pour éviter le spam
+    if isinstance(error, ChannelNotAllowedError):
+        try:
+            await ctx.message.add_reaction("❌")
+        except discord.HTTPException:
+            pass
+        return
 
     if isinstance(error, (commands.MemberNotFound, commands.UserNotFound)):
         await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Impossible de trouver cet utilisateur."))
