@@ -71,6 +71,49 @@ eco_lock = asyncio.Lock()
 # Cache du prefix (évite d'ouvrir SQLite à chaque message reçu)
 _prefix_cache = {"value": None}
 
+# ========================= GIFS D'ANIMATION DES JEUX =========================
+# Durée d'attente avant d'afficher le résultat (en secondes)
+GAME_ANIMATION_DELAY = 2.5
+
+# URLs Tenor de GIFs pour chaque jeu (esthétiques, non liés au résultat réel)
+GAME_GIFS = {
+    "roulette": [
+        "https://media.tenor.com/XC-nQLYbZJIAAAAM/roulette-spin.gif",
+        "https://media.tenor.com/LYNJ8V9BNXwAAAAM/roulette-casino.gif",
+        "https://media.tenor.com/oo6eX1agwicAAAAM/casino-las-vegas.gif",
+    ],
+    "slots": [
+        "https://media.tenor.com/-73GnVukQDAAAAAM/slot-machine.gif",
+        "https://media.tenor.com/6OLt7AUwxVoAAAAM/slot-machine-jackpot.gif",
+        "https://media.tenor.com/SmwpKTRFOfwAAAAM/slots-jackpot.gif",
+    ],
+    "jackpot": [
+        "https://media.tenor.com/ZS4cRgZnFIgAAAAM/jackpot-win.gif",
+        "https://media.tenor.com/6OLt7AUwxVoAAAAM/slot-machine-jackpot.gif",
+        "https://media.tenor.com/q9vPrUE5bWQAAAAM/money-cash.gif",
+    ],
+    "des": [
+        "https://media.tenor.com/Lf7TQy05oSIAAAAM/dice-roll.gif",
+        "https://media.tenor.com/pAqV_ZkZR6gAAAAM/dice-rolling.gif",
+        "https://media.tenor.com/wJ_RJ3f1uFAAAAAM/dice-roll.gif",
+    ],
+    "pfc": [
+        "https://media.tenor.com/jkA8GLzQ5bcAAAAM/rock-paper-scissors.gif",
+        "https://media.tenor.com/Iz_y-xvsmsQAAAAM/rock-paper-scissors-fight.gif",
+        "https://media.tenor.com/yPoEzk_LRmwAAAAM/rock-paper-scissors.gif",
+    ],
+}
+
+
+def pick_game_gif(game):
+    """Retourne une URL de GIF random pour un jeu donné."""
+    import random as _r
+    gifs = GAME_GIFS.get(game, [])
+    if not gifs:
+        return None
+    return _r.choice(gifs)
+
+
 # ========================= XP TABLE =========================
 # Niveau i nécessite XP_TABLE[i] XP total (exponentiel)
 def xp_for_level(level):
@@ -2698,12 +2741,31 @@ async def _slots(ctx, amount_str: str = None):
 
     record_game_cooldown(ctx.author.id, "slots")
     await add_xp(ctx, ctx.author.id, xp_reward)
+
+    # Animation : d'abord le GIF de suspense, puis le résultat
+    gif_url = pick_game_gif("slots")
+    anim_embed = discord.Embed(
+        title="🎰 Slots",
+        description=f"Les rouleaux tournent...\n**Mise :** {format_ryo(amount)}",
+        color=0x5865f2,
+    )
+    if gif_url:
+        anim_embed.set_image(url=gif_url)
+    anim_embed.set_author(name=ctx.author.display_name,
+                          icon_url=ctx.author.display_avatar.url)
+
+    msg = await ctx.send(embed=anim_embed)
+    await asyncio.sleep(GAME_ANIMATION_DELAY)
+
     description = (
         f"🎰 [ {reels[0]} | {reels[1]} | {reels[2]} ]\n\n"
         f"{result}\n"
         f"Mise : **{format_ryo(amount)}**  ・  ✨ **+{xp_reward} XP**"
     )
-    await ctx.send(embed=action_embed(ctx.author, description, color=color))
+    try:
+        await msg.edit(embed=action_embed(ctx.author, description, color=color))
+    except discord.HTTPException:
+        await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 @bot.command(name="jackpot")
@@ -2792,13 +2854,31 @@ async def _jackpot(ctx, amount_str: str = None):
     record_game_cooldown(ctx.author.id, "jackpot")
     await add_xp(ctx, ctx.author.id, xp_reward)
     pool_after = jackpot_get(ctx.guild.id)
+
+    # Animation
+    gif_url = pick_game_gif("jackpot")
+    anim_embed = discord.Embed(
+        title="💰 Jackpot",
+        description=f"Tirage en cours...\n**Mise :** {format_ryo(amount)}\n**Pot actuel :** {format_ryo(pool_before)}",
+        color=0xf1c40f,
+    )
+    if gif_url:
+        anim_embed.set_image(url=gif_url)
+    anim_embed.set_author(name=ctx.author.display_name,
+                          icon_url=ctx.author.display_avatar.url)
+    msg = await ctx.send(embed=anim_embed)
+    await asyncio.sleep(GAME_ANIMATION_DELAY)
+
     description = (
         f"🎰 [ {reels[0]} | {reels[1]} | {reels[2]} ]\n\n"
         f"{result}\n"
         f"Mise : **{format_ryo(amount)}**  ・  ✨ **+{xp_reward} XP**\n"
         f"💰 Pot actuel : **{format_ryo(pool_after)}**"
     )
-    await ctx.send(embed=action_embed(ctx.author, description, color=color))
+    try:
+        await msg.edit(embed=action_embed(ctx.author, description, color=color))
+    except discord.HTTPException:
+        await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 @bot.command(name="pot")
@@ -2912,13 +2992,30 @@ async def _roulette(ctx, amount_str: str = None, bet_type: str = None):
     record_game_cooldown(ctx.author.id, "roulette")
     await add_xp(ctx, ctx.author.id, xp_reward)
 
+    # Animation : GIF de roulette qui tourne puis résultat
+    gif_url = pick_game_gif("roulette")
+    anim_embed = discord.Embed(
+        title="🎡 Roulette",
+        description=f"La bille tourne...\n**Pari :** {bet_type} ・ **Mise :** {format_ryo(amount)}",
+        color=0x5865f2,
+    )
+    if gif_url:
+        anim_embed.set_image(url=gif_url)
+    anim_embed.set_author(name=ctx.author.display_name,
+                          icon_url=ctx.author.display_avatar.url)
+    msg = await ctx.send(embed=anim_embed)
+    await asyncio.sleep(GAME_ANIMATION_DELAY)
+
     color_emoji = {"rouge": "🔴", "noir": "⚫", "vert": "🟢"}[result_color]
     description = (
         f"🎡 La bille s'arrête sur : {color_emoji} **{result_number}** ({result_color})\n\n"
         f"Ton pari : **{bet_type}** ・ Mise : **{format_ryo(amount)}**\n"
         f"{result_line} ・ ✨ **+{xp_reward} XP**"
     )
-    await ctx.send(embed=action_embed(ctx.author, description, color=color))
+    try:
+        await msg.edit(embed=action_embed(ctx.author, description, color=color))
+    except discord.HTTPException:
+        await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 @bot.command(name="des", aliases=["dice"])
@@ -2966,12 +3063,29 @@ async def _des(ctx, amount_str: str = None):
     record_game_cooldown(ctx.author.id, "des")
     await add_xp(ctx, ctx.author.id, xp_reward)
 
+    # Animation : dés qui roulent
+    gif_url = pick_game_gif("des")
+    anim_embed = discord.Embed(
+        title="🎲 Dés",
+        description=f"Les dés roulent...\n**Mise :** {format_ryo(amount)}",
+        color=0x5865f2,
+    )
+    if gif_url:
+        anim_embed.set_image(url=gif_url)
+    anim_embed.set_author(name=ctx.author.display_name,
+                          icon_url=ctx.author.display_avatar.url)
+    msg = await ctx.send(embed=anim_embed)
+    await asyncio.sleep(GAME_ANIMATION_DELAY)
+
     dice_emojis = {1: "⚀", 2: "⚁", 3: "⚂", 4: "⚃", 5: "⚄", 6: "⚅"}
     description = (
         f"🎲 Toi : {dice_emojis[player]} **{player}**  ・  Bot : {dice_emojis[bot_roll]} **{bot_roll}**\n\n"
         f"{result_line} ・ ✨ **+{xp_reward} XP**"
     )
-    await ctx.send(embed=action_embed(ctx.author, description, color=color))
+    try:
+        await msg.edit(embed=action_embed(ctx.author, description, color=color))
+    except discord.HTTPException:
+        await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 @bot.command(name="pfc", aliases=["rps"])
@@ -3033,12 +3147,29 @@ async def _pfc(ctx, amount_str: str = None, choice: str = None):
     record_game_cooldown(ctx.author.id, "pfc")
     await add_xp(ctx, ctx.author.id, xp_reward)
 
+    # Animation : mains qui s'affrontent
+    gif_url = pick_game_gif("pfc")
     p_emoji = {"pierre": "🪨", "feuille": "📄", "ciseaux": "✂️"}
+    anim_embed = discord.Embed(
+        title="✊✋✌️ Pierre-Feuille-Ciseaux",
+        description=f"Ton choix : {p_emoji[player]} **{player}**\n**Mise :** {format_ryo(amount)}\n\nLe bot réfléchit...",
+        color=0x5865f2,
+    )
+    if gif_url:
+        anim_embed.set_image(url=gif_url)
+    anim_embed.set_author(name=ctx.author.display_name,
+                          icon_url=ctx.author.display_avatar.url)
+    msg = await ctx.send(embed=anim_embed)
+    await asyncio.sleep(GAME_ANIMATION_DELAY)
+
     description = (
         f"{p_emoji[player]} Toi : **{player}**  ・  {p_emoji[bot_choice]} Bot : **{bot_choice}**\n\n"
         f"{result_line} ・ ✨ **+{xp_reward} XP**"
     )
-    await ctx.send(embed=action_embed(ctx.author, description, color=color))
+    try:
+        await msg.edit(embed=action_embed(ctx.author, description, color=color))
+    except discord.HTTPException:
+        await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
 # ========================= BLACKJACK =========================
