@@ -75,43 +75,77 @@ _prefix_cache = {"value": None}
 # Durée d'attente avant d'afficher le résultat (en secondes)
 GAME_ANIMATION_DELAY = 2.5
 
-# URLs Tenor de GIFs pour chaque jeu (esthétiques, non liés au résultat réel)
+# GIFs d'animation : URLs Discord CDN (signées, valides ~24h)
+# Le bot les rafraîchit automatiquement via l'API Discord quand elles expirent.
+# Seul l'ID du channel et l'ID du fichier sont permanents, le reste est regénéré.
 GAME_GIFS = {
     "roulette": [
-        "https://media.tenor.com/XC-nQLYbZJIAAAAM/roulette-spin.gif",
-        "https://media.tenor.com/LYNJ8V9BNXwAAAAM/roulette-casino.gif",
-        "https://media.tenor.com/oo6eX1agwicAAAAM/casino-las-vegas.gif",
+        "https://media.discordapp.net/attachments/1492171715554316441/1496879896469704897/roulette.gif?ex=69eb7d8a&is=69ea2c0a&hm=6c743179d92c47d029bc1243516f51808cfbfe1a824b5cf81af0bd340a193091&=",
     ],
     "slots": [
-        "https://media.tenor.com/-73GnVukQDAAAAAM/slot-machine.gif",
-        "https://media.tenor.com/6OLt7AUwxVoAAAAM/slot-machine-jackpot.gif",
-        "https://media.tenor.com/SmwpKTRFOfwAAAAM/slots-jackpot.gif",
+        "https://media.discordapp.net/attachments/1492171715554316441/1496879896075436164/slots.gif?ex=69eb7d89&is=69ea2c09&hm=d15ae289591af0a75f47a5a8fe02d143fb061ed072099238a5041eca4d7ed1ca&=",
     ],
     "jackpot": [
-        "https://media.tenor.com/ZS4cRgZnFIgAAAAM/jackpot-win.gif",
-        "https://media.tenor.com/6OLt7AUwxVoAAAAM/slot-machine-jackpot.gif",
-        "https://media.tenor.com/q9vPrUE5bWQAAAAM/money-cash.gif",
+        "https://media.discordapp.net/attachments/1492171715554316441/1496879895631102184/jackpot.gif?ex=69eb7d89&is=69ea2c09&hm=6805eaac51c82cc3c246deb0bb331ff8b1a3c210c92b1b67a1876e74237f3626&=",
     ],
     "des": [
-        "https://media.tenor.com/Lf7TQy05oSIAAAAM/dice-roll.gif",
-        "https://media.tenor.com/pAqV_ZkZR6gAAAAM/dice-rolling.gif",
-        "https://media.tenor.com/wJ_RJ3f1uFAAAAAM/dice-roll.gif",
+        "https://media.discordapp.net/attachments/1492171715554316441/1496879895140110377/dice.gif?ex=69eb7d89&is=69ea2c09&hm=09b1d8f77cfc68a76aa7d90f7ab082fdc9ee2b304ce6e54d4b889de98ac893c7&=",
     ],
     "pfc": [
-        "https://media.tenor.com/jkA8GLzQ5bcAAAAM/rock-paper-scissors.gif",
-        "https://media.tenor.com/Iz_y-xvsmsQAAAAM/rock-paper-scissors-fight.gif",
-        "https://media.tenor.com/yPoEzk_LRmwAAAAM/rock-paper-scissors.gif",
+        "https://media.discordapp.net/attachments/1492171715554316441/1496879894846771240/pfc.gif?ex=69eb7d89&is=69ea2c09&hm=629db8081e101dda7135f55aac297fa6325632ad6a92a69c722e46190070778c&=",
     ],
 }
 
+# Cache des URLs rafraîchies : {original_url: (fresh_url, expires_at_timestamp)}
+_gif_url_cache = {}
 
-def pick_game_gif(game):
-    """Retourne une URL de GIF random pour un jeu donné."""
+
+async def get_fresh_gif_url(original_url):
+    """
+    Retourne une URL de GIF valide (non expirée).
+    Si l'URL est expirée ou va expirer bientôt, demande une URL fraîche à Discord.
+    Cache les résultats pour éviter de spam l'API.
+    """
+    import time as _t
+    now = _t.time()
+
+    # Check cache
+    cached = _gif_url_cache.get(original_url)
+    if cached:
+        fresh_url, expires_at = cached
+        # Si l'URL fraîche expire dans > 5 minutes, on la réutilise
+        if expires_at - now > 300:
+            return fresh_url
+
+    # On appelle l'API Discord pour régénérer l'URL
+    try:
+        route = discord.http.Route("POST", "/attachments/refresh-urls")
+        payload = {"attachment_urls": [original_url]}
+        data = await bot.http.request(route, json=payload)
+        refreshed = data.get("refreshed_urls", [])
+        if refreshed and refreshed[0].get("refreshed"):
+            fresh_url = refreshed[0]["refreshed"]
+            # Extraire l'expiration depuis le paramètre ?ex=<hex_timestamp>
+            import re
+            m = re.search(r'[?&]ex=([0-9a-fA-F]+)', fresh_url)
+            expires_at = int(m.group(1), 16) if m else now + 3600  # fallback 1h
+            _gif_url_cache[original_url] = (fresh_url, expires_at)
+            return fresh_url
+    except Exception as e:
+        log.warning(f"Refresh GIF URL échoué : {e}")
+
+    # Fallback : on retourne l'URL originale (peut marcher si pas encore expirée)
+    return original_url
+
+
+async def pick_game_gif(game):
+    """Retourne une URL de GIF valide (auto-refresh) pour un jeu donné."""
     import random as _r
     gifs = GAME_GIFS.get(game, [])
     if not gifs:
         return None
-    return _r.choice(gifs)
+    chosen = _r.choice(gifs)
+    return await get_fresh_gif_url(chosen)
 
 
 # ========================= XP TABLE =========================
@@ -2743,7 +2777,7 @@ async def _slots(ctx, amount_str: str = None):
     await add_xp(ctx, ctx.author.id, xp_reward)
 
     # Animation : d'abord le GIF de suspense, puis le résultat
-    gif_url = pick_game_gif("slots")
+    gif_url = await pick_game_gif("slots")
     anim_embed = discord.Embed(
         title="🎰 Slots",
         description=f"Les rouleaux tournent...\n**Mise :** {format_ryo(amount)}",
@@ -2856,7 +2890,7 @@ async def _jackpot(ctx, amount_str: str = None):
     pool_after = jackpot_get(ctx.guild.id)
 
     # Animation
-    gif_url = pick_game_gif("jackpot")
+    gif_url = await pick_game_gif("jackpot")
     anim_embed = discord.Embed(
         title="💰 Jackpot",
         description=f"Tirage en cours...\n**Mise :** {format_ryo(amount)}\n**Pot actuel :** {format_ryo(pool_before)}",
@@ -2993,7 +3027,7 @@ async def _roulette(ctx, amount_str: str = None, bet_type: str = None):
     await add_xp(ctx, ctx.author.id, xp_reward)
 
     # Animation : GIF de roulette qui tourne puis résultat
-    gif_url = pick_game_gif("roulette")
+    gif_url = await pick_game_gif("roulette")
     anim_embed = discord.Embed(
         title="🎡 Roulette",
         description=f"La bille tourne...\n**Pari :** {bet_type} ・ **Mise :** {format_ryo(amount)}",
@@ -3064,7 +3098,7 @@ async def _des(ctx, amount_str: str = None):
     await add_xp(ctx, ctx.author.id, xp_reward)
 
     # Animation : dés qui roulent
-    gif_url = pick_game_gif("des")
+    gif_url = await pick_game_gif("des")
     anim_embed = discord.Embed(
         title="🎲 Dés",
         description=f"Les dés roulent...\n**Mise :** {format_ryo(amount)}",
@@ -3148,7 +3182,7 @@ async def _pfc(ctx, amount_str: str = None, choice: str = None):
     await add_xp(ctx, ctx.author.id, xp_reward)
 
     # Animation : mains qui s'affrontent
-    gif_url = pick_game_gif("pfc")
+    gif_url = await pick_game_gif("pfc")
     p_emoji = {"pierre": "🪨", "feuille": "📄", "ciseaux": "✂️"}
     anim_embed = discord.Embed(
         title="✊✋✌️ Pierre-Feuille-Ciseaux",
