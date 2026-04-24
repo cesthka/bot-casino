@@ -27,28 +27,28 @@ if not BOT_TOKEN:
     sys.exit(1)
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
-DEFAULT_BUYER_IDS = [1312375955737542676, 1173948561881317389, 1279358145151373352]
+DEFAULT_BUYER_IDS = [1312375517927706630, 1312375955737542676, 1173948561881317389, 1279358145151373352]
 DEFAULT_PREFIX = "*"
 MIN_BET = 100  # Mise minimum pour slots/jackpot/blackjack (évite le farm XP)
 ROB_COOLDOWN = 3600  # 1h de cooldown sur *rob
 
 # Cooldowns par jeu (secondes) - défauts, modifiables via *setcooldown
 DEFAULT_GAME_COOLDOWNS = {
-    "slots":    5,
-    "jackpot":  5,
-    "bj":       5,
+    "slots": 5,
+    "jackpot": 5,
+    "bj": 5,
     "roulette": 5,
-    "des":      5,
-    "pfc":      5,
+    "des": 5,
+    "pfc": 5,
 }
 
 # Gains vocaux par défaut (par tick, en Ryo)
 DEFAULT_VOCAL_GAINS = {
-    "base":     50,   # juste présent en voc
-    "talk":     25,   # +bonus si non-mute
-    "stream":   50,   # +bonus si stream
-    "cam":      75,   # +bonus si cam
-    "interval": 15,   # intervalle en minutes entre chaque tick
+    "base": 50,  # juste présent en voc
+    "talk": 25,  # +bonus si non-mute
+    "stream": 50,  # +bonus si stream
+    "cam": 75,  # +bonus si cam
+    "interval": 15,  # intervalle en minutes entre chaque tick
 }
 
 # Pot de jackpot initial (si le pot tombe à 0 il remonte à ça)
@@ -152,6 +152,7 @@ async def pick_game_gif(game):
 # Niveau i nécessite XP_TABLE[i] XP total (exponentiel)
 def xp_for_level(level):
     return int(100 * (level ** 2.2))
+
 
 # ========================= DATABASE =========================
 
@@ -354,7 +355,8 @@ def init_db():
         log.warning(f"Migration active_messages ignorée : {e}")
 
     c.execute("INSERT OR IGNORE INTO config VALUES ('prefix', ?)", (DEFAULT_PREFIX,))
-    c.execute("INSERT OR IGNORE INTO config VALUES ('buyer_ids', ?)", (json.dumps([str(i) for i in DEFAULT_BUYER_IDS]),))
+    c.execute("INSERT OR IGNORE INTO config VALUES ('buyer_ids', ?)",
+              (json.dumps([str(i) for i in DEFAULT_BUYER_IDS]),))
     c.execute("INSERT OR IGNORE INTO config VALUES ('game_cooldowns', ?)", (json.dumps(DEFAULT_GAME_COOLDOWNS),))
     c.execute("INSERT OR IGNORE INTO config VALUES ('vocal_gains', ?)", (json.dumps(DEFAULT_VOCAL_GAINS),))
 
@@ -434,9 +436,9 @@ def update_economy(user_id, **kwargs):
     conn.execute("""INSERT OR REPLACE INTO economy 
         (user_id, hand, bank, fame, xp, level, last_daily, last_fame, last_work, last_fish, last_rob, escrow)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (str(user_id), eco["hand"], eco["bank"], eco["fame"], eco["xp"], eco["level"],
-         eco.get("last_daily"), eco.get("last_fame"), eco.get("last_work"), eco.get("last_fish"),
-         eco.get("last_rob"), eco.get("escrow", 0)))
+                 (str(user_id), eco["hand"], eco["bank"], eco["fame"], eco["xp"], eco["level"],
+                  eco.get("last_daily"), eco.get("last_fame"), eco.get("last_work"), eco.get("last_fish"),
+                  eco.get("last_rob"), eco.get("escrow", 0)))
     conn.commit()
     conn.close()
 
@@ -554,7 +556,7 @@ def get_active_members(guild_id, limit=10):
     # FIX: vrai filtre par guild_id (avant le filtre ne faisait rien)
     rows = conn.execute("""SELECT user_id, message_content FROM active_messages 
         WHERE guild_id = ? AND timestamp > ? ORDER BY timestamp DESC LIMIT ?""",
-        (str(guild_id), cutoff, limit)).fetchall()
+                        (str(guild_id), cutoff, limit)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -569,9 +571,9 @@ def shop_add_item(guild_id, name, price, description, item_type, role_id=None,
         (guild_id, name, price, description, item_type, role_id, duration_hours,
          multiplier, stock, created_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (str(guild_id), name, int(price), description, item_type,
-         str(role_id) if role_id else None, duration_hours, multiplier, stock,
-         str(created_by) if created_by else None, now))
+                       (str(guild_id), name, int(price), description, item_type,
+                        str(role_id) if role_id else None, duration_hours, multiplier, stock,
+                        str(created_by) if created_by else None, now))
     item_id = cur.lastrowid
     conn.commit()
     conn.close()
@@ -625,7 +627,7 @@ def shop_decrement_stock(item_id):
     try:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT stock FROM shop_items WHERE id = ?",
-                          (int(item_id),)).fetchone()
+                           (int(item_id),)).fetchone()
         if not row:
             conn.rollback()
             return False
@@ -638,7 +640,7 @@ def shop_decrement_stock(item_id):
             conn.rollback()
             return False
         conn.execute("UPDATE shop_items SET stock = stock - 1 WHERE id = ?",
-                    (int(item_id),))
+                     (int(item_id),))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -657,7 +659,7 @@ def inv_add(user_id, guild_id, item_id, item_name, expires_at=None):
     conn.execute("""INSERT INTO inventories
         (user_id, guild_id, item_id, item_name_snapshot, acquired_at, expires_at, active)
         VALUES (?, ?, ?, ?, ?, ?, 1)""",
-        (str(user_id), str(guild_id), int(item_id), item_name, now, expires_at))
+                 (str(user_id), str(guild_id), int(item_id), item_name, now, expires_at))
     conn.commit()
     conn.close()
 
@@ -668,12 +670,12 @@ def inv_list(user_id, guild_id, active_only=True):
         rows = conn.execute("""SELECT * FROM inventories
             WHERE user_id = ? AND guild_id = ? AND active = 1
             ORDER BY acquired_at DESC""",
-            (str(user_id), str(guild_id))).fetchall()
+                            (str(user_id), str(guild_id))).fetchall()
     else:
         rows = conn.execute("""SELECT * FROM inventories
             WHERE user_id = ? AND guild_id = ?
             ORDER BY acquired_at DESC""",
-            (str(user_id), str(guild_id))).fetchall()
+                            (str(user_id), str(guild_id))).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -684,7 +686,7 @@ def inv_get_expiring():
     now_iso = datetime.now(PARIS_TZ).isoformat()
     rows = conn.execute("""SELECT * FROM inventories
         WHERE active = 1 AND expires_at IS NOT NULL AND expires_at <= ?""",
-        (now_iso,)).fetchall()
+                        (now_iso,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -704,7 +706,7 @@ def boost_add(user_id, guild_id, boost_type, multiplier, duration_hours):
     conn.execute("""INSERT OR REPLACE INTO active_boosts
         (user_id, guild_id, boost_type, multiplier, expires_at)
         VALUES (?, ?, ?, ?, ?)""",
-        (str(user_id), str(guild_id), boost_type, float(multiplier), expires))
+                 (str(user_id), str(guild_id), boost_type, float(multiplier), expires))
     conn.commit()
     conn.close()
 
@@ -713,7 +715,7 @@ def boost_get(user_id, guild_id, boost_type):
     conn = get_db()
     row = conn.execute("""SELECT * FROM active_boosts
         WHERE user_id = ? AND guild_id = ? AND boost_type = ?""",
-        (str(user_id), str(guild_id), boost_type)).fetchone()
+                       (str(user_id), str(guild_id), boost_type)).fetchone()
     conn.close()
     if not row:
         return None
@@ -741,7 +743,7 @@ def vocal_start_session(user_id, guild_id, channel_id):
     now = datetime.now(PARIS_TZ).isoformat()
     conn.execute("""INSERT OR REPLACE INTO vocal_sessions
         (user_id, guild_id, channel_id, joined_at, last_tick_at) VALUES (?, ?, ?, ?, ?)""",
-        (str(user_id), str(guild_id), str(channel_id), now, now))
+                 (str(user_id), str(guild_id), str(channel_id), now, now))
     conn.commit()
     conn.close()
 
@@ -767,7 +769,7 @@ def vocal_update_tick(user_id, guild_id, channel_id):
     now = datetime.now(PARIS_TZ).isoformat()
     conn.execute("""UPDATE vocal_sessions SET last_tick_at = ?, channel_id = ?
         WHERE user_id = ? AND guild_id = ?""",
-        (now, str(channel_id), str(user_id), str(guild_id)))
+                 (now, str(channel_id), str(user_id), str(guild_id)))
     conn.commit()
     conn.close()
 
@@ -781,8 +783,8 @@ def vocal_add_stats(user_id, guild_id, minutes, earned):
             ON CONFLICT(user_id, guild_id) DO UPDATE SET
                 total_minutes = total_minutes + ?,
                 total_earned = total_earned + ?""",
-            (str(user_id), str(guild_id), int(minutes), int(earned),
-             int(minutes), int(earned)))
+                     (str(user_id), str(guild_id), int(minutes), int(earned),
+                      int(minutes), int(earned)))
         conn.commit()
     except sqlite3.Error as e:
         conn.rollback()
@@ -806,7 +808,7 @@ def zone_add(channel_id, guild_id, multiplier, set_by):
     now = datetime.now(PARIS_TZ).isoformat()
     conn.execute("""INSERT OR REPLACE INTO vocal_zones
         (channel_id, guild_id, multiplier, set_by, set_at) VALUES (?, ?, ?, ?, ?)""",
-        (str(channel_id), str(guild_id), float(multiplier), str(set_by), now))
+                 (str(channel_id), str(guild_id), float(multiplier), str(set_by), now))
     conn.commit()
     conn.close()
 
@@ -862,7 +864,7 @@ def check_game_cooldown(user_id, game):
     conn = get_db()
     row = conn.execute("""SELECT last_played FROM game_cooldowns
         WHERE user_id = ? AND game = ?""",
-        (str(user_id), game)).fetchone()
+                       (str(user_id), game)).fetchone()
     conn.close()
     if not row:
         return True, None
@@ -881,7 +883,7 @@ def record_game_cooldown(user_id, game):
     now = datetime.now(PARIS_TZ).isoformat()
     conn.execute("""INSERT OR REPLACE INTO game_cooldowns (user_id, game, last_played)
         VALUES (?, ?, ?)""",
-        (str(user_id), game, now))
+                 (str(user_id), game, now))
     conn.commit()
     conn.close()
 
@@ -911,7 +913,7 @@ def jackpot_get(guild_id):
     if not row:
         # Initialise à JACKPOT_POOL_MIN
         conn.execute("INSERT OR IGNORE INTO jackpot_pool (guild_id, amount) VALUES (?, ?)",
-                    (str(guild_id), JACKPOT_POOL_MIN))
+                     (str(guild_id), JACKPOT_POOL_MIN))
         conn.commit()
         amount = JACKPOT_POOL_MIN
     else:
@@ -926,7 +928,7 @@ def jackpot_add(guild_id, amount):
         conn.execute("BEGIN IMMEDIATE")
         conn.execute("""INSERT INTO jackpot_pool (guild_id, amount) VALUES (?, ?)
             ON CONFLICT(guild_id) DO UPDATE SET amount = amount + ?""",
-            (str(guild_id), int(amount), int(amount)))
+                     (str(guild_id), int(amount), int(amount)))
         conn.commit()
     finally:
         conn.close()
@@ -937,7 +939,7 @@ def jackpot_reset(guild_id, new_amount=None):
     amount = new_amount if new_amount is not None else JACKPOT_POOL_MIN
     conn = get_db()
     conn.execute("""INSERT OR REPLACE INTO jackpot_pool (guild_id, amount) VALUES (?, ?)""",
-                (str(guild_id), int(amount)))
+                 (str(guild_id), int(amount)))
     conn.commit()
     conn.close()
 
@@ -949,7 +951,7 @@ def loto_buy_ticket(user_id, guild_id):
     now = datetime.now(PARIS_TZ).isoformat()
     conn.execute("""INSERT INTO loto_tickets (guild_id, user_id, purchased_at)
         VALUES (?, ?, ?)""",
-        (str(guild_id), str(user_id), now))
+                 (str(guild_id), str(user_id), now))
     conn.commit()
     conn.close()
 
@@ -966,7 +968,7 @@ def loto_count_user_tickets(user_id, guild_id):
     conn = get_db()
     row = conn.execute("""SELECT COUNT(*) as c FROM loto_tickets
         WHERE guild_id = ? AND user_id = ?""",
-        (str(guild_id), str(user_id))).fetchone()
+                       (str(guild_id), str(user_id))).fetchone()
     conn.close()
     return row["c"] if row else 0
 
@@ -988,10 +990,10 @@ def loto_get_config(guild_id):
         next_draw = (now + timedelta(days=7)).isoformat()
         conn.execute("""INSERT INTO loto_config
             (guild_id, next_draw_at, auto_interval_days) VALUES (?, ?, 7)""",
-            (str(guild_id), next_draw))
+                     (str(guild_id), next_draw))
         conn.commit()
         row = conn.execute("SELECT * FROM loto_config WHERE guild_id = ?",
-                          (str(guild_id),)).fetchone()
+                           (str(guild_id),)).fetchone()
     conn.close()
     return dict(row)
 
@@ -1000,7 +1002,7 @@ def loto_set_next_draw(guild_id, next_draw_iso):
     conn = get_db()
     loto_get_config(guild_id)  # s'assure que la ligne existe
     conn.execute("UPDATE loto_config SET next_draw_at = ? WHERE guild_id = ?",
-                (next_draw_iso, str(guild_id)))
+                 (next_draw_iso, str(guild_id)))
     conn.commit()
     conn.close()
 
@@ -1014,8 +1016,8 @@ def loto_record_draw(guild_id, winner_id, prize):
     conn.execute("""UPDATE loto_config SET
         last_draw_at = ?, last_winner_id = ?, last_prize = ?, next_draw_at = ?
         WHERE guild_id = ?""",
-        (now.isoformat(), str(winner_id) if winner_id else None,
-         int(prize) if prize else 0, next_draw, str(guild_id)))
+                 (now.isoformat(), str(winner_id) if winner_id else None,
+                  int(prize) if prize else 0, next_draw, str(guild_id)))
     conn.commit()
     conn.close()
 
@@ -1054,11 +1056,11 @@ def lb_top(guild_id, metric, limit=10):
     elif metric == "vocal_time":
         rows = conn.execute("""SELECT user_id, total_minutes as value FROM vocal_stats
             WHERE guild_id = ? AND total_minutes > 0 ORDER BY total_minutes DESC LIMIT ?""",
-            (str(guild_id), limit)).fetchall()
+                            (str(guild_id), limit)).fetchall()
     elif metric == "vocal_earned":
         rows = conn.execute("""SELECT user_id, total_earned as value FROM vocal_stats
             WHERE guild_id = ? AND total_earned > 0 ORDER BY total_earned DESC LIMIT ?""",
-            (str(guild_id), limit)).fetchall()
+                            (str(guild_id), limit)).fetchall()
     else:
         rows = []
     conn.close()
@@ -1676,13 +1678,13 @@ HELP_CATEGORIES = {
         "title": "💰  Économie",
         "items": [
             # (syntaxe, description, min_rank)
-            ("bal [@user]",        "Balance d'un membre",     0),
-            ("daily / dy",         "Récompense quotidienne",  0),
-            ("dep [somme/all]",    "Déposer en bank",         0),
-            ("with [somme/all]",   "Retirer de la bank",      0),
-            ("give [somme] @user", "Donner des Ryo",          0),
-            ("rob @user",          "Voler (5-30% main)",      0),
-            ("fame @user",         "Famer quelqu'un",         0),
+            ("bal [@user]", "Balance d'un membre", 0),
+            ("daily / dy", "Récompense quotidienne", 0),
+            ("dep [somme/all]", "Déposer en bank", 0),
+            ("with [somme/all]", "Retirer de la bank", 0),
+            ("give [somme] @user", "Donner des Ryo", 0),
+            ("rob @user", "Voler (5-30% main)", 0),
+            ("fame @user", "Famer quelqu'un", 0),
         ],
     },
     "jeux": {
@@ -1690,16 +1692,16 @@ HELP_CATEGORIES = {
         "label": "Jeux",
         "title": "🎮  Jeux",
         "items": [
-            ("slots <mise/all>",             "Machine à sous",               0),
-            ("bj <mise/all>",                "Blackjack",                    0),
-            ("jackpot <mise/all>",           "Jackpot avec pot partagé",     0),
-            ("pot",                          "Voir la cagnotte du jackpot",  0),
-            ("roulette <mise> <type>",       "Roulette (rouge/noir/0-36)",   0),
-            ("des <mise>",                   "Lance un dé contre le bot",    0),
-            ("pfc <mise> <choix>",           "Pierre-Feuille-Ciseaux",       0),
-            ("fish",                         "Pêche (30min cooldown)",       0),
-            ("work",                         "Boulot (1h cooldown)",         0),
-            ("cooldowns",                    "Voir les cooldowns des jeux",  0),
+            ("slots <mise/all>", "Machine à sous", 0),
+            ("bj <mise/all>", "Blackjack", 0),
+            ("jackpot <mise/all>", "Jackpot avec pot partagé", 0),
+            ("pot", "Voir la cagnotte du jackpot", 0),
+            ("roulette <mise> <type>", "Roulette (rouge/noir/0-36)", 0),
+            ("des <mise>", "Lance un dé contre le bot", 0),
+            ("pfc <mise> <choix>", "Pierre-Feuille-Ciseaux", 0),
+            ("fish", "Pêche (30min cooldown)", 0),
+            ("work", "Boulot (1h cooldown)", 0),
+            ("cooldowns", "Voir les cooldowns des jeux", 0),
         ],
     },
     "shop": {
@@ -1707,9 +1709,9 @@ HELP_CATEGORIES = {
         "label": "Shop",
         "title": "🛒  Shop",
         "items": [
-            ("shop",                   "Voir les items à vendre",      0),
-            ("buy <id>",               "Acheter un item",              0),
-            ("inv / inventaire [@u]",  "Voir son inventaire",          0),
+            ("shop", "Voir les items à vendre", 0),
+            ("buy <id>", "Acheter un item", 0),
+            ("inv / inventaire [@u]", "Voir son inventaire", 0),
         ],
     },
     "classement": {
@@ -1717,7 +1719,7 @@ HELP_CATEGORIES = {
         "label": "Classement",
         "title": "🏆  Classement",
         "items": [
-            ("lb / leaderboard",  "Classement (menu déroulant)",  0),
+            ("lb / leaderboard", "Classement (menu déroulant)", 0),
         ],
     },
     "vocal": {
@@ -1725,9 +1727,9 @@ HELP_CATEGORIES = {
         "label": "Vocal",
         "title": "🎤  Vocal",
         "items": [
-            ("vocalstats [@user]",  "Tes stats vocales et gains",   0),
-            ("vocalconfig",         "Config actuelle des gains",    1),
-            ("zones",               "Liste des zones à mult.",      0),
+            ("vocalstats [@user]", "Tes stats vocales et gains", 0),
+            ("vocalconfig", "Config actuelle des gains", 1),
+            ("zones", "Liste des zones à mult.", 0),
         ],
     },
     "loto": {
@@ -1735,10 +1737,10 @@ HELP_CATEGORIES = {
         "label": "Loterie",
         "title": "🎰  Loterie",
         "items": [
-            ("loto",            "Voir l'état de la loterie",     0),
-            ("loto ticket",     "Acheter un ticket (1000 Ryo)",  0),
-            ("loto tirage",     "Forcer un tirage (Sys+)",       3),
-            ("lotodate <durée>", "Modifier la date du tirage",    3),
+            ("loto", "Voir l'état de la loterie", 0),
+            ("loto ticket", "Acheter un ticket (1000 Ryo)", 0),
+            ("loto tirage", "Forcer un tirage (Sys+)", 3),
+            ("lotodate <durée>", "Modifier la date du tirage", 3),
         ],
     },
     "speciaux": {
@@ -1746,9 +1748,9 @@ HELP_CATEGORIES = {
         "label": "Spéciaux",
         "title": "🎁  Spéciaux",
         "items": [
-            ("enchere @role",          "Lancer une enchère",           2),
-            ("encheredit <minutes>",   "Modifier durée enchère",       3),
-            ("drop [somme]",           "Drop d'argent",                2),
+            ("enchere @role", "Lancer une enchère", 2),
+            ("encheredit <minutes>", "Modifier durée enchère", 3),
+            ("drop [somme]", "Drop d'argent", 2),
         ],
     },
     "shop_admin": {
@@ -1756,10 +1758,10 @@ HELP_CATEGORIES = {
         "label": "Shop Admin",
         "title": "🛍️  Shop Admin",
         "items": [
-            ("additem <nom>",                 "Ajouter un item (modal)",        3),
-            ("edititem <id> <champ> <val>",   "Modifier un champ d'un item",    3),
-            ("removeitem <id>",               "Supprimer un item",              3),
-            ("setstock <id> <n/illimite>",    "Réappro / stock illimité",       3),
+            ("additem <nom>", "Ajouter un item (modal)", 3),
+            ("edititem <id> <champ> <val>", "Modifier un champ d'un item", 3),
+            ("removeitem <id>", "Supprimer un item", 3),
+            ("setstock <id> <n/illimite>", "Réappro / stock illimité", 3),
         ],
     },
     "config": {
@@ -1767,10 +1769,10 @@ HELP_CATEGORIES = {
         "label": "Config",
         "title": "🎚️  Config (Sys+)",
         "items": [
-            ("setzone #voc <mult>",              "Zone vocale à multiplicateur",    3),
-            ("unsetzone #voc",                   "Retirer une zone",                3),
-            ("setvocalgain <champ> <valeur>",    "Config des gains vocaux",         3),
-            ("setcooldown <jeu> <secondes>",     "Cooldown d'un jeu",               3),
+            ("setzone #voc <mult>", "Zone vocale à multiplicateur", 3),
+            ("unsetzone #voc", "Retirer une zone", 3),
+            ("setvocalgain <champ> <valeur>", "Config des gains vocaux", 3),
+            ("setcooldown <jeu> <secondes>", "Cooldown d'un jeu", 3),
         ],
     },
     "admin": {
@@ -1778,13 +1780,13 @@ HELP_CATEGORIES = {
         "label": "Admin",
         "title": "🔧  Admin",
         "items": [
-            ("addmoney @user [somme]",    "Ajouter de l'argent", 3),
+            ("addmoney @user [somme]", "Ajouter de l'argent", 3),
             ("removemoney @user [somme]", "Retirer de l'argent", 3),
-            ("resetbal @user",            "Reset balance",       3),
-            ("addxp @user [somme]",       "Ajouter de l'XP",     3),
-            ("resetlevel @user",          "Reset niveau/XP",     3),
-            ("ban @user",                 "Bannir du bot",       3),
-            ("unban @user",               "Débannir du bot",     3),
+            ("resetbal @user", "Reset balance", 3),
+            ("addxp @user [somme]", "Ajouter de l'XP", 3),
+            ("resetlevel @user", "Reset niveau/XP", 3),
+            ("ban @user", "Bannir du bot", 3),
+            ("unban @user", "Débannir du bot", 3),
         ],
     },
     "perms": {
@@ -1792,9 +1794,9 @@ HELP_CATEGORIES = {
         "label": "Permissions",
         "title": "👥  Permissions",
         "items": [
-            ("wl @user / unwl @user",       "Gérer la whitelist", 2),
-            ("owner @user / unowner @user", "Gérer les owners",   3),
-            ("sys @user / unsys @user",     "Gérer les sys",      4),
+            ("wl @user / unwl @user", "Gérer la whitelist", 2),
+            ("owner @user / unowner @user", "Gérer les owners", 3),
+            ("sys @user / unsys @user", "Gérer les sys", 4),
         ],
     },
     "system": {
@@ -1802,12 +1804,12 @@ HELP_CATEGORIES = {
         "label": "Système",
         "title": "⚙️  Système",
         "items": [
-            ("allow #salon",      "Autoriser un salon pour le bot", 3),
-            ("unallow #salon",    "Retirer un salon autorisé",      3),
-            ("allow",             "Lister les salons autorisés",    3),
-            ("setenchere #salon", "Définir le salon des enchères",  3),
-            ("setlog #salon",     "Définir le salon des logs",      4),
-            ("prefix [nouveau]",  "Changer le prefix",              4),
+            ("allow #salon", "Autoriser un salon pour le bot", 3),
+            ("unallow #salon", "Retirer un salon autorisé", 3),
+            ("allow", "Lister les salons autorisés", 3),
+            ("setenchere #salon", "Définir le salon des enchères", 3),
+            ("setlog #salon", "Définir le salon des logs", 4),
+            ("prefix [nouveau]", "Changer le prefix", 4),
         ],
     },
     "hierarchy": {
@@ -1853,7 +1855,7 @@ def build_category_embed(category_key, user_rank):
         ]
         em.description = "```\n" + "\n".join(lines) + "\n```"
 
-    em.set_footer(text="Made by gp ・ Velda")
+    em.set_footer(text="Velda ・ Meira")
     return em
 
 
@@ -1863,17 +1865,17 @@ def build_hierarchy_embed(user_rank):
     lines = ["```\nBuyer > Sys > Owner > Whitelist > Tout le monde\n```\n"]
     # On affiche chaque niveau, mais on marque celui du user
     levels = [
-        (4, "👑 **Buyer**",     "Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`"),
-        (3, "🔧 **Sys**",       "`*allow`/`*unallow`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
-        (2, "⭐ **Owner**",      "`*enchere`, `*drop`, `*wl`/`*unwl`"),
-        (1, "✨ **Whitelist**",  "Statut privilégié"),
+        (4, "👑 **Buyer**", "Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`"),
+        (3, "🔧 **Sys**", "`*allow`/`*unallow`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
+        (2, "⭐ **Owner**", "`*enchere`, `*drop`, `*wl`/`*unwl`"),
+        (1, "✨ **Whitelist**", "Statut privilégié"),
         (0, "👤 **Tout le monde**", "Jeux et commandes éco"),
     ]
     for rank, name, desc in levels:
         marker = " ← **toi**" if rank == user_rank else ""
         lines.append(f"> {name} — {desc}{marker}")
     em.description = "\n".join(lines)
-    em.set_footer(text="Made by gp ・ Velda")
+    em.set_footer(text="Velda ・ Meira")
     return em
 
 
@@ -1881,7 +1883,7 @@ def build_home_embed(user_rank):
     """Embed d'accueil personnalisé : ne liste que les catégories accessibles au user."""
     p = get_prefix_cached()
     em = discord.Embed(color=embed_color())
-    em.set_author(name="Velda ─ Panel d'aide")
+    em.set_author(name="Velda - Meira")
 
     rank_label = rank_name(user_rank)
     intro = (
@@ -1892,19 +1894,19 @@ def build_home_embed(user_rank):
 
     # Liste uniquement les catégories visibles au user (hors Accueil lui-même)
     category_descriptions = {
-        "eco":        "Bal, daily, dépôts, give, rob...",
-        "jeux":       "Slots, BJ, jackpot, roulette, dés, PFC...",
-        "shop":       "Acheter des rôles, boosts, items",
+        "eco": "Bal, daily, dépôts, give, rob...",
+        "jeux": "Slots, BJ, jackpot, roulette, dés, PFC...",
+        "shop": "Acheter des rôles, boosts, items",
         "classement": "Leaderboard (argent, XP, vocal...)",
-        "vocal":      "Stats vocales et zones",
-        "loto":       "Loterie avec tirages automatiques",
-        "speciaux":   "Enchères, drop",
+        "vocal": "Stats vocales et zones",
+        "loto": "Loterie avec tirages automatiques",
+        "speciaux": "Enchères, drop",
         "shop_admin": "Créer/modifier les items du shop",
-        "config":     "Config des zones, gains vocaux, cooldowns",
-        "admin":      "Gérer l'argent et l'XP des membres",
-        "perms":      "Attribuer les rangs",
-        "system":     "Configuration du bot",
-        "hierarchy":  "Qui peut faire quoi",
+        "config": "Config des zones, gains vocaux, cooldowns",
+        "admin": "Gérer l'argent et l'XP des membres",
+        "perms": "Attribuer les rangs",
+        "system": "Configuration du bot",
+        "hierarchy": "Qui peut faire quoi",
     }
     visible_lines = []
     for key, label in category_descriptions.items():
@@ -1913,7 +1915,7 @@ def build_home_embed(user_rank):
             visible_lines.append(f"> {cat['emoji']} **{cat['label']}** — {label}")
 
     em.description = intro + "\n".join(visible_lines) if visible_lines else intro
-    em.set_footer(text="Made by gp ・ Velda")
+    em.set_footer(text="Velda ・ Meira")
     return em
 
 
@@ -2151,9 +2153,11 @@ async def _sys(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if get_rank_db(user_id) == 3:
-        return await ctx.send(embed=error_embed("Déjà Sys", f"{format_user_display(display_obj, user_id)} est déjà sys."))
+        return await ctx.send(
+            embed=error_embed("Déjà Sys", f"{format_user_display(display_obj, user_id)} est déjà sys."))
     set_rank_db(user_id, 3)
-    await ctx.send(embed=success_embed("✅ Sys ajouté", f"{format_user_display(display_obj, user_id)} ajouté en **sys**."))
+    await ctx.send(
+        embed=success_embed("✅ Sys ajouté", f"{format_user_display(display_obj, user_id)} ajouté en **sys**."))
 
 
 @bot.command(name="unsys")
@@ -2168,9 +2172,11 @@ async def _unsys(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if get_rank_db(user_id) != 3:
-        return await ctx.send(embed=error_embed("Pas Sys", f"{format_user_display(display_obj, user_id)} n'est pas sys."))
+        return await ctx.send(
+            embed=error_embed("Pas Sys", f"{format_user_display(display_obj, user_id)} n'est pas sys."))
     set_rank_db(user_id, 0)
-    await ctx.send(embed=success_embed("✅ Sys retiré", f"{format_user_display(display_obj, user_id)} retiré des **sys**."))
+    await ctx.send(
+        embed=success_embed("✅ Sys retiré", f"{format_user_display(display_obj, user_id)} retiré des **sys**."))
 
 
 @bot.command(name="owner")
@@ -2191,9 +2197,11 @@ async def _owner(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if get_rank_db(user_id) >= 3:
-        return await ctx.send(embed=error_embed("❌ Erreur", f"{format_user_display(display_obj, user_id)} a un rang supérieur ou égal."))
+        return await ctx.send(
+            embed=error_embed("❌ Erreur", f"{format_user_display(display_obj, user_id)} a un rang supérieur ou égal."))
     set_rank_db(user_id, 2)
-    await ctx.send(embed=success_embed("✅ Owner ajouté", f"{format_user_display(display_obj, user_id)} ajouté en **owner**."))
+    await ctx.send(
+        embed=success_embed("✅ Owner ajouté", f"{format_user_display(display_obj, user_id)} ajouté en **owner**."))
 
 
 @bot.command(name="unowner")
@@ -2208,9 +2216,11 @@ async def _unowner(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if get_rank_db(user_id) != 2:
-        return await ctx.send(embed=error_embed("Pas Owner", f"{format_user_display(display_obj, user_id)} n'est pas owner."))
+        return await ctx.send(
+            embed=error_embed("Pas Owner", f"{format_user_display(display_obj, user_id)} n'est pas owner."))
     set_rank_db(user_id, 0)
-    await ctx.send(embed=success_embed("✅ Owner retiré", f"{format_user_display(display_obj, user_id)} retiré des **owners**."))
+    await ctx.send(
+        embed=success_embed("✅ Owner retiré", f"{format_user_display(display_obj, user_id)} retiré des **owners**."))
 
 
 @bot.command(name="wl")
@@ -2231,9 +2241,11 @@ async def _wl(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if get_rank_db(user_id) >= 2:
-        return await ctx.send(embed=error_embed("❌ Erreur", f"{format_user_display(display_obj, user_id)} a un rang supérieur ou égal."))
+        return await ctx.send(
+            embed=error_embed("❌ Erreur", f"{format_user_display(display_obj, user_id)} a un rang supérieur ou égal."))
     set_rank_db(user_id, 1)
-    await ctx.send(embed=success_embed("✅ WL ajouté", f"{format_user_display(display_obj, user_id)} ajouté à la **whitelist**."))
+    await ctx.send(
+        embed=success_embed("✅ WL ajouté", f"{format_user_display(display_obj, user_id)} ajouté à la **whitelist**."))
 
 
 @bot.command(name="unwl")
@@ -2250,7 +2262,8 @@ async def _unwl(ctx, *, user_input: str = None):
     if get_rank_db(user_id) != 1:
         return await ctx.send(embed=error_embed("Pas WL", f"{format_user_display(display_obj, user_id)} n'est pas wl."))
     set_rank_db(user_id, 0)
-    await ctx.send(embed=success_embed("✅ WL retiré", f"{format_user_display(display_obj, user_id)} retiré de la **whitelist**."))
+    await ctx.send(
+        embed=success_embed("✅ WL retiré", f"{format_user_display(display_obj, user_id)} retiré de la **whitelist**."))
 
 
 # ========================= BAN BOT =========================
@@ -2267,9 +2280,11 @@ async def _ban(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if is_bot_banned(user_id):
-        return await ctx.send(embed=error_embed("Déjà banni", f"{format_user_display(display_obj, user_id)} est déjà banni du bot."))
+        return await ctx.send(
+            embed=error_embed("Déjà banni", f"{format_user_display(display_obj, user_id)} est déjà banni du bot."))
     add_bot_ban(user_id, ctx.author.id)
-    await ctx.send(embed=success_embed("⛔ Banni du bot", f"{format_user_display(display_obj, user_id)} ne peut plus utiliser **Velda**."))
+    await ctx.send(embed=success_embed("⛔ Banni du bot",
+                                       f"{format_user_display(display_obj, user_id)} ne peut plus utiliser **Velda**."))
 
 
 @bot.command(name="unban")
@@ -2284,9 +2299,11 @@ async def _unban(ctx, *, user_input: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     if not is_bot_banned(user_id):
-        return await ctx.send(embed=error_embed("Pas banni", f"{format_user_display(display_obj, user_id)} n'est pas banni du bot."))
+        return await ctx.send(
+            embed=error_embed("Pas banni", f"{format_user_display(display_obj, user_id)} n'est pas banni du bot."))
     remove_bot_ban(user_id)
-    await ctx.send(embed=success_embed("✅ Débanni", f"{format_user_display(display_obj, user_id)} peut à nouveau utiliser **Velda**."))
+    await ctx.send(embed=success_embed("✅ Débanni",
+                                       f"{format_user_display(display_obj, user_id)} peut à nouveau utiliser **Velda**."))
 
 
 # ========================= ADMIN ECO =========================
@@ -2323,7 +2340,8 @@ async def _addmoney(ctx, *, args: str = None):
 
     async with eco_lock:
         atomic_hand_delta(user_id, amount, min_hand=0)
-    await ctx.send(embed=success_embed("✅ Argent ajouté", f"+{format_ryo(amount)} ajouté à {format_user_display(display_obj, user_id)}."))
+    await ctx.send(embed=success_embed("✅ Argent ajouté",
+                                       f"+{format_ryo(amount)} ajouté à {format_user_display(display_obj, user_id)}."))
 
 
 @bot.command(name="removemoney")
@@ -2342,7 +2360,8 @@ async def _removemoney(ctx, *, args: str = None):
         eco = get_economy(user_id)
         new_hand = max(0, eco["hand"] - amount)
         update_economy(user_id, hand=new_hand)
-    await ctx.send(embed=success_embed("✅ Argent retiré", f"-{format_ryo(amount)} retiré à {format_user_display(display_obj, user_id)}."))
+    await ctx.send(embed=success_embed("✅ Argent retiré",
+                                       f"-{format_ryo(amount)} retiré à {format_user_display(display_obj, user_id)}."))
 
 
 @bot.command(name="resetbal")
@@ -2358,7 +2377,8 @@ async def _resetbal(ctx, *, user_input: str = None):
 
     async with eco_lock:
         update_economy(user_id, hand=0, bank=0)
-    await ctx.send(embed=success_embed("✅ Balance reset", f"La balance de {format_user_display(display_obj, user_id)} a été remise à 0."))
+    await ctx.send(embed=success_embed("✅ Balance reset",
+                                       f"La balance de {format_user_display(display_obj, user_id)} a été remise à 0."))
 
 
 @bot.command(name="addxp")
@@ -2374,7 +2394,8 @@ async def _addxp(ctx, *, args: str = None):
         return await ctx.send(embed=error_embed("❌ Utilisateur introuvable", "Donne une mention, un nom ou un ID."))
 
     await add_xp(ctx, user_id, amount)
-    await ctx.send(embed=success_embed("✅ XP ajouté", f"+{amount} XP ajouté à {format_user_display(display_obj, user_id)}."))
+    await ctx.send(
+        embed=success_embed("✅ XP ajouté", f"+{amount} XP ajouté à {format_user_display(display_obj, user_id)}."))
 
 
 @bot.command(name="resetlevel")
@@ -2390,7 +2411,8 @@ async def _resetlevel(ctx, *, user_input: str = None):
 
     async with eco_lock:
         update_economy(user_id, xp=0, level=0)
-    await ctx.send(embed=success_embed("✅ Niveau reset", f"Le niveau de {format_user_display(display_obj, user_id)} a été remis à 0."))
+    await ctx.send(embed=success_embed("✅ Niveau reset",
+                                       f"Le niveau de {format_user_display(display_obj, user_id)} a été remis à 0."))
 
 
 # ========================= ÉCONOMIE =========================
@@ -2472,7 +2494,8 @@ async def _dep(ctx, amount_str: str = None):
         if amount is None or amount <= 0:
             return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide ou `all`."))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en poche."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en poche."))
         if not atomic_hand_bank(ctx.author.id, -amount, +amount):
             return await ctx.send(embed=error_embed("Erreur", "Le dépôt a échoué, réessaie."))
         new_hand = eco["hand"] - amount
@@ -2497,7 +2520,8 @@ async def _withdraw(ctx, amount_str: str = None):
         if amount is None or amount <= 0:
             return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide ou `all`."))
         if amount > eco["bank"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['bank'])} en banque."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['bank'])} en banque."))
         if not atomic_hand_bank(ctx.author.id, +amount, -amount):
             return await ctx.send(embed=error_embed("Erreur", "Le retrait a échoué, réessaie."))
         new_hand = eco["hand"] + amount
@@ -2534,7 +2558,8 @@ async def _give(ctx, amount_str: str = None, *, user_input: str = None):
         if amount is None or amount <= 0:
             return await ctx.send(embed=error_embed("Montant invalide", "Donne un montant valide."))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en poche."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en poche."))
         # FIX: transfert atomique (évite duplication/perte en cas de concurrence)
         if not atomic_transfer(ctx.author.id, target.id, amount):
             return await ctx.send(embed=error_embed("Erreur", "Le transfert a échoué, réessaie."))
@@ -2572,7 +2597,8 @@ async def _rob(ctx, *, user_input: str = None):
                 remaining = ROB_COOLDOWN - diff.total_seconds()
                 m = int(remaining // 60)
                 s = int(remaining % 60)
-                return await ctx.send(embed=error_embed("⏰ Cooldown", f"Reviens dans **{m}min {s}s** pour voler à nouveau."))
+                return await ctx.send(
+                    embed=error_embed("⏰ Cooldown", f"Reviens dans **{m}min {s}s** pour voler à nouveau."))
 
         eco_target = get_economy(target.id)
         if eco_target["hand"] <= 0:
@@ -2590,7 +2616,7 @@ async def _rob(ctx, *, user_input: str = None):
     await add_xp(ctx, ctx.author.id, 20)
     desc = (
         f"{ctx.author.mention} a volé {target.mention} !\n\n"
-        f"🥷 **{format_ryo(stolen)}** dérobés ({int(percent*100)}%)\n"
+        f"🥷 **{format_ryo(stolen)}** dérobés ({int(percent * 100)}%)\n"
         f"✨ **+20 XP**"
     )
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
@@ -2714,7 +2740,8 @@ async def _fish(ctx):
     xp_amount = xp_gain.get(rarity, 10)
     await add_xp(ctx, ctx.author.id, xp_amount)
 
-    rarity_colors = {"commun": 0x95a5a6, "peu commun": 0x2ecc71, "rare": 0x3498db, "épique": 0x9b59b6, "légendaire": 0xf1c40f, "déchet": 0x7f8c8d}
+    rarity_colors = {"commun": 0x95a5a6, "peu commun": 0x2ecc71, "rare": 0x3498db, "épique": 0x9b59b6,
+                     "légendaire": 0xf1c40f, "déchet": 0x7f8c8d}
     description = (
         f"🎣 {name} *({rarity})*\n"
         f"🟡 **+{format_ryo(amount)}** en poche\n"
@@ -2743,7 +2770,8 @@ async def _slots(ctx, amount_str: str = None):
         if amount < MIN_BET:
             return await ctx.send(embed=error_embed("Mise trop basse", f"Mise minimum : {format_ryo(MIN_BET)}"))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
 
         # Probabilités ajustées - plus dur de gagner gros
         symbols = ["🍒", "🍋", "🍊", "🍇", "⭐", "💎", "7️⃣"]
@@ -2824,7 +2852,8 @@ async def _jackpot(ctx, amount_str: str = None):
         if amount < MIN_BET:
             return await ctx.send(embed=error_embed("Mise trop basse", f"Mise minimum : {format_ryo(MIN_BET)}"))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
 
         # Tirage de 3 symboles
         symbols = ["🍒", "🍋", "🍊", "🔔", "⭐", "💎", "7️⃣"]
@@ -2980,11 +3009,12 @@ async def _roulette(ctx, amount_str: str = None, bet_type: str = None):
         if amount < MIN_BET:
             return await ctx.send(embed=error_embed("Mise trop basse", f"Mise minimum : {format_ryo(MIN_BET)}"))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
 
         # Tirage
         result_number = random.randint(0, 36)
-        red_numbers = {1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36}
+        red_numbers = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
         result_color = "vert" if result_number == 0 else ("rouge" if result_number in red_numbers else "noir")
 
         # Détermine si gagné
@@ -2998,17 +3028,23 @@ async def _roulette(ctx, amount_str: str = None, bet_type: str = None):
             if result_number == 0:
                 won = False  # 0 = la banque gagne pour toutes les mises extérieures
             elif bet_type_lower in ("rouge", "red") and result_color == "rouge":
-                won = True; multiplier = 2
+                won = True;
+                multiplier = 2
             elif bet_type_lower in ("noir", "black") and result_color == "noir":
-                won = True; multiplier = 2
+                won = True;
+                multiplier = 2
             elif bet_type_lower in ("pair", "even") and result_number % 2 == 0 and result_number != 0:
-                won = True; multiplier = 2
+                won = True;
+                multiplier = 2
             elif bet_type_lower in ("impair", "odd") and result_number % 2 == 1:
-                won = True; multiplier = 2
+                won = True;
+                multiplier = 2
             elif bet_type_lower == "manque" and 1 <= result_number <= 18:
-                won = True; multiplier = 2
+                won = True;
+                multiplier = 2
             elif bet_type_lower == "passe" and 19 <= result_number <= 36:
-                won = True; multiplier = 2
+                won = True;
+                multiplier = 2
 
         if won:
             winnings = amount * multiplier
@@ -3072,7 +3108,8 @@ async def _des(ctx, amount_str: str = None):
         if amount < MIN_BET:
             return await ctx.send(embed=error_embed("Mise trop basse", f"Mise minimum : {format_ryo(MIN_BET)}"))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
 
         player = random.randint(1, 6)
         bot_roll = random.randint(1, 6)
@@ -3156,7 +3193,8 @@ async def _pfc(ctx, amount_str: str = None, choice: str = None):
         if amount < MIN_BET:
             return await ctx.send(embed=error_embed("Mise trop basse", f"Mise minimum : {format_ryo(MIN_BET)}"))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
 
         bot_choice = random.choice(["pierre", "feuille", "ciseaux"])
 
@@ -3347,7 +3385,8 @@ async def _bj(ctx, amount_str: str = None):
     # Cooldown
     ok, remaining = check_game_cooldown(ctx.author.id, "bj")
     if not ok:
-        return await ctx.send(embed=error_embed("⏰ Cooldown", f"Attends **{remaining}s** avant de rejouer au blackjack."))
+        return await ctx.send(
+            embed=error_embed("⏰ Cooldown", f"Attends **{remaining}s** avant de rejouer au blackjack."))
 
     async with eco_lock:
         eco = get_economy(ctx.author.id)
@@ -3357,7 +3396,8 @@ async def _bj(ctx, amount_str: str = None):
         if amount < MIN_BET:
             return await ctx.send(embed=error_embed("Mise trop basse", f"Mise minimum : {format_ryo(MIN_BET)}"))
         if amount > eco["hand"]:
-            return await ctx.send(embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
+            return await ctx.send(
+                embed=error_embed("Fonds insuffisants", f"Tu n'as que {format_ryo(eco['hand'])} en main."))
 
         # FIX: escrow — on débite immédiatement pour qu'il ne puisse pas dépenser la mise ailleurs
         if not atomic_hand_delta(ctx.author.id, -amount, min_hand=0):
@@ -3820,14 +3860,14 @@ async def _encheredit(ctx, duration_min: int = None):
 # ========================= LEADERBOARD =========================
 
 LB_METRICS = {
-    "hand":         {"emoji": "💰", "label": "Argent en main",  "suffix": "Ryo",     "guild_only": False},
-    "bank":         {"emoji": "🏦", "label": "Argent en banque","suffix": "Ryo",     "guild_only": False},
-    "total":        {"emoji": "💎", "label": "Total (main + bank)", "suffix": "Ryo", "guild_only": False},
-    "fame":         {"emoji": "⭐", "label": "Fame",             "suffix": "fame",    "guild_only": False},
-    "xp":           {"emoji": "✨", "label": "XP",               "suffix": "XP",      "guild_only": False},
-    "level":        {"emoji": "📈", "label": "Niveau",           "suffix": "",        "guild_only": False},
-    "vocal_time":   {"emoji": "🎤", "label": "Temps en vocal",   "suffix": "minutes", "guild_only": True},
-    "vocal_earned": {"emoji": "💵", "label": "Gains vocaux",     "suffix": "Ryo",     "guild_only": True},
+    "hand": {"emoji": "💰", "label": "Argent en main", "suffix": "Ryo", "guild_only": False},
+    "bank": {"emoji": "🏦", "label": "Argent en banque", "suffix": "Ryo", "guild_only": False},
+    "total": {"emoji": "💎", "label": "Total (main + bank)", "suffix": "Ryo", "guild_only": False},
+    "fame": {"emoji": "⭐", "label": "Fame", "suffix": "fame", "guild_only": False},
+    "xp": {"emoji": "✨", "label": "XP", "suffix": "XP", "guild_only": False},
+    "level": {"emoji": "📈", "label": "Niveau", "suffix": "", "guild_only": False},
+    "vocal_time": {"emoji": "🎤", "label": "Temps en vocal", "suffix": "minutes", "guild_only": True},
+    "vocal_earned": {"emoji": "💵", "label": "Gains vocaux", "suffix": "Ryo", "guild_only": True},
 }
 
 
@@ -3844,7 +3884,7 @@ def build_lb_embed(guild, metric_key):
         medals = ["🥇", "🥈", "🥉"]
         lines = []
         for i, (uid, val) in enumerate(top):
-            marker = medals[i] if i < 3 else f"**{i+1}.**"
+            marker = medals[i] if i < 3 else f"**{i + 1}.**"
             if meta["suffix"] == "Ryo":
                 value_display = f"**{format_ryo(val)}**"
             else:
@@ -4087,7 +4127,7 @@ async def _vocalconfig(ctx):
         f"interval = {gains.get('interval', 15)} min\n"
         f"```\n"
         f"**Exemple de gain max** (talk + stream + cam) : "
-        f"**{gains.get('base',50) + gains.get('talk',25) + gains.get('stream',50) + gains.get('cam',75)} Ryo** "
+        f"**{gains.get('base', 50) + gains.get('talk', 25) + gains.get('stream', 50) + gains.get('cam', 75)} Ryo** "
         f"toutes les {gains.get('interval', 15)}min.\n\n"
         f"*Modifie via `*setvocalgain <champ> <valeur>` (Sys+)*"
     )
@@ -4203,7 +4243,8 @@ async def _loto(ctx, action: str = None):
         if not has_min_rank(ctx.author.id, 3):
             return await ctx.send(embed=error_embed("❌ Permission refusée", "**Sys+** requis pour forcer un tirage."))
         if not tickets:
-            return await ctx.send(embed=error_embed("❌ Aucun ticket", "Personne n'a de ticket, pas de tirage possible."))
+            return await ctx.send(
+                embed=error_embed("❌ Aucun ticket", "Personne n'a de ticket, pas de tirage possible."))
         await _do_loto_draw(ctx.guild, triggered_by="manuel")
         await ctx.send(embed=success_embed("✅ Tirage effectué", "Voir l'annonce."))
         return
@@ -4217,7 +4258,7 @@ async def _loto(ctx, action: str = None):
         ))
 
     await ctx.send(embed=error_embed("❌ Action inconnue",
-        "Actions : `ticket`, `tirage` (Sys+), ou juste `*loto` pour voir l'état."))
+                                     "Actions : `ticket`, `tirage` (Sys+), ou juste `*loto` pour voir l'état."))
 
 
 @bot.command(name="lotodate")
@@ -4234,7 +4275,8 @@ async def _lotodate(ctx, *, duration: str = None):
     # Parse la durée (format : 7j, 2h, 30m, ou combinaisons 2h30m, 1j12h)
     import re as _re
     total_seconds = 0
-    for match in _re.finditer(r"(\d+)\s*(j|jour|jours|d|day|h|hour|hours|m|min|minute|minutes|s|sec)?", duration.lower()):
+    for match in _re.finditer(r"(\d+)\s*(j|jour|jours|d|day|h|hour|hours|m|min|minute|minutes|s|sec)?",
+                              duration.lower()):
         val = int(match.group(1))
         unit = match.group(2) or "m"
         if unit in ("s", "sec"):
@@ -4264,11 +4306,11 @@ async def _lotodate(ctx, *, duration: str = None):
 # ========================= SHOP =========================
 
 ITEM_TYPES = {
-    "role":         {"emoji": "🎭", "label": "Rôle permanent"},
-    "temp_role":    {"emoji": "⏳", "label": "Rôle temporaire"},
-    "collectible":  {"emoji": "🎁", "label": "Item collection"},
-    "boost_xp":     {"emoji": "✨", "label": "Boost XP"},
-    "boost_vocal":  {"emoji": "🎤", "label": "Boost vocal"},
+    "role": {"emoji": "🎭", "label": "Rôle permanent"},
+    "temp_role": {"emoji": "⏳", "label": "Rôle temporaire"},
+    "collectible": {"emoji": "🎁", "label": "Item collection"},
+    "boost_xp": {"emoji": "✨", "label": "Boost XP"},
+    "boost_vocal": {"emoji": "🎤", "label": "Boost vocal"},
 }
 
 
@@ -4752,7 +4794,6 @@ async def _setstock(ctx, item_id: int = None, stock: str = None):
     shop_update_item(item_id, stock=parsed)
     stock_display = "♾️ illimité" if parsed is None else f"**{parsed}**"
     await ctx.send(embed=success_embed("✅ Stock modifié", f"Item `#{item_id}` : stock = {stock_display}"))
-
 
 
 # ========================= ERROR HANDLING =========================
