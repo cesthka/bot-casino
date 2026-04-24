@@ -1745,148 +1745,218 @@ HELP_CATEGORIES = {
     "eco": {
         "emoji": "💰",
         "label": "Économie",
-        "title": "💰  Économie",
-        "items": [
-            # (syntaxe, description, min_rank)
-            ("bal / b [@user]",    "Balance d'un membre",     0),
-            ("daily / dy",         "Récompense quotidienne",  0),
-            ("dep [somme/all]",    "Déposer en bank",         0),
-            ("with [somme/all]",   "Retirer de la bank",      0),
-            ("give / gv [somme] @user", "Donner des Ryo",          0),
-            ("rob / rb @user",          "Voler (5-30% main)",      0),
-            ("fame / fm @user",         "Famer quelqu'un",         0),
-            ("profil / pr [@user]",     "Carte de profil visuelle",0),
+        "title": "Économie",
+        "subtitle": "Gagne des Ryo, gère ta fortune, famme les autres.",
+        "sections": [
+            ("💵", "Gagner de l'argent", [
+                ("daily / dy",                  "Récompense quotidienne",  0),
+                ("work / wk",                   "Boulot (1h cooldown)",    0),
+            ]),
+            ("🏦", "Gérer ta fortune", [
+                ("bal / b [@user]",             "Voir ta balance",         0),
+                ("dep [somme/all]",             "Déposer en bank",         0),
+                ("with [somme/all]",            "Retirer de la bank",      0),
+            ]),
+            ("⚔️", "Interagir avec les autres", [
+                ("give / gv [somme] @user",     "Donner des Ryo",          0),
+                ("rob / rb @user",              "Voler (5-30% main)",      0),
+                ("fame / fm @user",             "Famer quelqu'un",         0),
+            ]),
+            ("🎴", "Ton profil", [
+                ("profil / pr [@user]",         "Carte de profil visuelle",0),
+            ]),
         ],
     },
     "jeux": {
         "emoji": "🎮",
         "label": "Jeux",
-        "title": "🎮  Jeux",
-        "items": [
-            ("slots / sl <mise/all>",             "Machine à sous",               0),
-            ("bj / blackjack <mise/all>",                "Blackjack",                    0),
-            ("jackpot / jp <mise/all>",           "Jackpot avec pot partagé",     0),
-            ("pot",                          "Voir la cagnotte du jackpot",  0),
-            ("roulette / rl <mise> <type>",       "Roulette (rouge/noir/0-36)",   0),
-            ("des / dice <mise>",                   "Lance un dé contre le bot",    0),
-            ("pfc / rps <mise> <choix>",     "Pierre-Feuille-Ciseaux",       0),
-            ("fish",                         "Pêche (30min cooldown)",       0),
-            ("work / wk",                    "Boulot (1h cooldown)",         0),
-            ("cooldowns",                    "Voir les cooldowns des jeux",  0),
+        "title": "Jeux",
+        "subtitle": "Tente ta chance au casino, vole et pêche des Ryo.",
+        "sections": [
+            ("🎰", "Casino classique", [
+                ("slots / sl <mise/all>",             "Machine à sous",               0),
+                ("bj / blackjack <mise/all>",         "Blackjack",                    0),
+                ("roulette / rl <mise> <type>",       "Roulette (rouge/noir/0-36)",   0),
+            ]),
+            ("🎲", "Jeux rapides", [
+                ("des / dice <mise>",                 "Lance un dé contre le bot",    0),
+                ("pfc / rps <mise> <choix>",          "Pierre-Feuille-Ciseaux",       0),
+            ]),
+            ("💰", "Cagnotte partagée", [
+                ("jackpot / jp <mise/all>",           "Jackpot avec pot partagé",     0),
+                ("pot",                               "Voir la cagnotte du jackpot",  0),
+            ]),
+            ("⏱️", "Annexes", [
+                ("fish",                              "Pêche (30min cooldown)",       0),
+                ("cooldowns",                         "Voir tous tes cooldowns",      0),
+            ]),
         ],
     },
     "shop": {
         "emoji": "🛒",
         "label": "Shop",
-        "title": "🛒  Shop",
-        "items": [
-            ("shop",                   "Voir les items à vendre",      0),
-            ("buy <id>",               "Acheter un item",              0),
-            ("inv / inventaire [@u]",  "Voir son inventaire",          0),
+        "title": "Shop",
+        "subtitle": "Dépense tes Ryo pour des rôles, boosts et cosmétiques.",
+        "sections": [
+            ("🛍️", "Acheter", [
+                ("shop",                    "Voir les items à vendre",      0),
+                ("buy <id>",                "Acheter un item",              0),
+            ]),
+            ("🎒", "Inventaire", [
+                ("inv / inventaire [@u]",   "Voir son inventaire",          0),
+            ]),
         ],
     },
     "classement": {
         "emoji": "🏆",
         "label": "Classement",
-        "title": "🏆  Classement",
-        "items": [
-            ("lb / leaderboard",  "Classement (menu déroulant)",  0),
+        "title": "Classement",
+        "subtitle": "Qui est le plus riche ? Le plus famé ? Le plus actif ?",
+        "sections": [
+            ("📊", "Voir les tops", [
+                ("lb / leaderboard",        "Classement (menu déroulant)",  0),
+            ]),
         ],
     },
     "vocal": {
         "emoji": "🎤",
         "label": "Vocal",
-        "title": "🎤  Vocal",
-        "items": [
-            ("vocalstats [@user]",  "Tes stats vocales et gains",   0),
-            ("vocalconfig",         "Config actuelle des gains",    1),
-            ("zones",               "Liste des zones à mult.",      0),
+        "title": "Vocal",
+        "subtitle": "Gains passifs en vocal selon les zones et bonus.",
+        "sections": [
+            ("🎧", "Stats & infos", [
+                ("vocalstats [@user]",      "Tes stats vocales et gains",   0),
+                ("zones",                   "Liste des zones à mult.",      0),
+            ]),
+            ("⚙️", "Config (WL+)", [
+                ("vocalconfig",             "Config actuelle des gains",    1),
+            ]),
         ],
     },
     "loto": {
         "emoji": "🎰",
         "label": "Loterie",
-        "title": "🎰  Loterie",
-        "items": [
-            ("loto",            "Voir l'état de la loterie",     0),
-            ("loto ticket",     "Acheter un ticket (1000 Ryo)",  0),
-            ("loto tirage",     "Forcer un tirage (Sys+)",       3),
-            ("lotodate <durée>", "Modifier la date du tirage",    3),
+        "title": "Loterie",
+        "subtitle": "Achète des tickets, tente de remporter le gros lot.",
+        "sections": [
+            ("🎟️", "Participer", [
+                ("loto",                    "Voir l'état de la loterie",    0),
+                ("loto ticket",             "Acheter un ticket (1000 Ryo)", 0),
+            ]),
+            ("🔧", "Admin (Sys+)", [
+                ("loto tirage",             "Forcer un tirage",             3),
+                ("lotodate <durée>",        "Modifier la date du tirage",   3),
+            ]),
         ],
     },
     "speciaux": {
         "emoji": "🎁",
         "label": "Spéciaux",
-        "title": "🎁  Spéciaux",
-        "items": [
-            ("enchere @role",          "Lancer une enchère",           2),
-            ("encheredit <minutes>",   "Modifier durée enchère",       3),
-            ("drop [somme]",           "Drop d'argent",                2),
+        "title": "Événements spéciaux",
+        "subtitle": "Animations & événements réservés aux Owner+.",
+        "sections": [
+            ("🏛️", "Lancer un event", [
+                ("enchere @role",           "Lancer une enchère",           2),
+                ("drop [somme]",            "Drop d'argent",                2),
+            ]),
+            ("⚙️", "Modifier (Sys+)", [
+                ("encheredit <minutes>",    "Modifier durée enchère",       3),
+            ]),
         ],
     },
     "shop_admin": {
         "emoji": "🛍️",
         "label": "Shop Admin",
-        "title": "🛍️  Shop Admin",
-        "items": [
-            ("additem <nom>",                 "Ajouter un item (modal)",        3),
-            ("edititem <id> <champ> <val>",   "Modifier un champ d'un item",    3),
-            ("removeitem <id>",               "Supprimer un item",              3),
-            ("setstock <id> <n/illimite>",    "Réappro / stock illimité",       3),
+        "title": "Shop Admin",
+        "subtitle": "Gère les items disponibles dans le shop.",
+        "sections": [
+            ("➕", "Ajouter & modifier", [
+                ("additem <nom>",               "Ajouter un item (modal)",        3),
+                ("edititem <id> <champ> <val>", "Modifier un champ d'un item",    3),
+            ]),
+            ("📦", "Stock & retrait", [
+                ("setstock <id> <n/illimite>",  "Réappro / stock illimité",       3),
+                ("removeitem <id>",             "Supprimer un item",              3),
+            ]),
         ],
     },
     "config": {
         "emoji": "🎚️",
         "label": "Config",
-        "title": "🎚️  Config (Sys+)",
-        "items": [
-            ("setzone #voc <mult>",              "Zone vocale à multiplicateur",    3),
-            ("unsetzone #voc",                   "Retirer une zone",                3),
-            ("setvocalgain <champ> <valeur>",    "Config des gains vocaux",         3),
-            ("setcooldown <jeu> <secondes>",     "Cooldown d'un jeu",               3),
+        "title": "Config (Sys+)",
+        "subtitle": "Paramètres avancés du bot (gains, cooldowns, zones).",
+        "sections": [
+            ("🎤", "Vocal & zones", [
+                ("setzone #voc <mult>",            "Zone vocale à multiplicateur",    3),
+                ("unsetzone #voc",                 "Retirer une zone",                3),
+                ("setvocalgain <champ> <valeur>",  "Config des gains vocaux",         3),
+            ]),
+            ("⏱️", "Jeux", [
+                ("setcooldown <jeu> <secondes>",   "Cooldown d'un jeu",               3),
+            ]),
         ],
     },
     "admin": {
         "emoji": "🔧",
         "label": "Admin",
-        "title": "🔧  Admin",
-        "items": [
-            ("addmoney @user [somme]",    "Ajouter de l'argent", 3),
-            ("removemoney @user [somme]", "Retirer de l'argent", 3),
-            ("resetbal @user",            "Reset balance",       3),
-            ("addxp @user [somme]",       "Ajouter de l'XP",     3),
-            ("resetlevel @user",          "Reset niveau/XP",     3),
-            ("ban @user",                 "Bannir du bot",       3),
-            ("unban @user",               "Débannir du bot",     3),
+        "title": "Administration (Sys+)",
+        "subtitle": "Outils de modération et gestion économique.",
+        "sections": [
+            ("💸", "Économie", [
+                ("addmoney @user [somme]",      "Ajouter de l'argent", 3),
+                ("removemoney @user [somme]",   "Retirer de l'argent", 3),
+                ("resetbal @user",              "Reset balance",       3),
+            ]),
+            ("✨", "XP & niveaux", [
+                ("addxp @user [somme]",         "Ajouter de l'XP",     3),
+                ("resetlevel @user",            "Reset niveau/XP",     3),
+            ]),
+            ("🚫", "Ban bot", [
+                ("ban @user",                   "Bannir du bot",       3),
+                ("unban @user",                 "Débannir du bot",     3),
+            ]),
         ],
     },
     "perms": {
         "emoji": "👥",
         "label": "Permissions",
-        "title": "👥  Permissions",
-        "items": [
-            ("wl @user / unwl @user",       "Gérer la whitelist", 2),
-            ("owner @user / unowner @user", "Gérer les owners",   3),
-            ("sys @user / unsys @user",     "Gérer les sys",      4),
+        "title": "Permissions",
+        "subtitle": "Gère les rangs des membres (Owner+).",
+        "sections": [
+            ("✨", "Whitelist (Owner+)", [
+                ("wl @user / unwl @user",       "Gérer la whitelist", 2),
+            ]),
+            ("⭐", "Owners (Sys+)", [
+                ("owner @user / unowner @user", "Gérer les owners",   3),
+            ]),
+            ("🔧", "Sys (Buyer)", [
+                ("sys @user / unsys @user",     "Gérer les sys",      4),
+            ]),
         ],
     },
     "system": {
         "emoji": "⚙️",
         "label": "Système",
-        "title": "⚙️  Système",
-        "items": [
-            ("allow #salon",      "Autoriser un salon pour le bot", 3),
-            ("unallow #salon",    "Retirer un salon autorisé",      3),
-            ("allow",             "Lister les salons autorisés",    3),
-            ("setenchere #salon", "Définir le salon des enchères",  3),
-            ("setlog #salon",     "Définir le salon des logs",      4),
-            ("prefix [nouveau]",  "Changer le prefix",              4),
+        "title": "Système",
+        "subtitle": "Config système du bot (salons, logs, prefix).",
+        "sections": [
+            ("📌", "Salons (Sys+)", [
+                ("allow #salon",         "Autoriser un salon pour le bot",  3),
+                ("unallow #salon",       "Retirer un salon autorisé",       3),
+                ("allow",                "Lister les salons autorisés",     3),
+                ("setenchere #salon",    "Définir le salon des enchères",   3),
+            ]),
+            ("🛡️", "Buyer only", [
+                ("setlog #salon",        "Définir le salon des logs",       4),
+                ("prefix [nouveau]",     "Changer le prefix",               4),
+            ]),
         ],
     },
     "hierarchy": {
         "emoji": "📋",
         "label": "Hiérarchie",
-        "title": "📋  Hiérarchie",
+        "title": "Hiérarchie",
+        "subtitle": "Les différents rangs du bot et leurs pouvoirs.",
         "min_rank": 2,  # Visible qu'à partir d'Owner
         "items": [],
     },
@@ -1894,9 +1964,33 @@ HELP_CATEGORIES = {
 
 
 def accessible_items(category_key, user_rank):
-    """Retourne la liste des (syntaxe, description) accessibles au user pour cette catégorie."""
+    """Retourne la liste plate des (syntaxe, description) accessibles au user pour cette catégorie.
+    Supporte la structure 'sections' ET l'ancienne 'items' pour rétrocompat."""
     cat = HELP_CATEGORIES.get(category_key, {})
-    return [(syntax, desc) for (syntax, desc, min_rank) in cat.get("items", []) if user_rank >= min_rank]
+    result = []
+    # Nouvelle structure : sections
+    for section in cat.get("sections", []):
+        _emoji, _title, items = section
+        for (syntax, desc, min_rank) in items:
+            if user_rank >= min_rank:
+                result.append((syntax, desc))
+    # Ancienne structure : items plats
+    for (syntax, desc, min_rank) in cat.get("items", []):
+        if user_rank >= min_rank:
+            result.append((syntax, desc))
+    return result
+
+
+def accessible_sections(category_key, user_rank):
+    """Retourne les sections [(emoji, title, [(syntax, desc), ...])] filtrées par rang."""
+    cat = HELP_CATEGORIES.get(category_key, {})
+    result = []
+    for section in cat.get("sections", []):
+        emoji, title, items = section
+        visible = [(syn, desc) for (syn, desc, min_r) in items if user_rank >= min_r]
+        if visible:
+            result.append((emoji, title, visible))
+    return result
 
 
 def category_visible(category_key, user_rank):
@@ -1908,62 +2002,121 @@ def category_visible(category_key, user_rank):
     return len(accessible_items(category_key, user_rank)) > 0
 
 
-def build_category_embed(category_key, user_rank):
-    """Construit un embed pour la catégorie donnée, filtré au rang du user."""
+def _apply_guild_thumbnail(em, ctx_or_guild):
+    """Ajoute l'icône du serveur en thumbnail de l'embed si dispo."""
+    guild = getattr(ctx_or_guild, "guild", None) or ctx_or_guild
+    if guild and getattr(guild, "icon", None):
+        try:
+            em.set_thumbnail(url=guild.icon.url)
+        except (AttributeError, TypeError):
+            pass
+
+
+def build_category_embed(category_key, user_rank, guild=None):
+    """Construit un embed stylé pour la catégorie donnée, filtré au rang du user.
+    Utilise la nouvelle structure 'sections' avec groupes + code blocks inline."""
     p = get_prefix_cached()
     cat = HELP_CATEGORIES[category_key]
-    em = discord.Embed(title=cat["title"], color=embed_color())
+    emoji = cat.get("emoji", "📋")
+    title = cat.get("title", "Commandes")
+    subtitle = cat.get("subtitle", "")
 
-    items = accessible_items(category_key, user_rank)
-    if not items:
-        em.description = "*Aucune commande accessible à ton rang.*"
-    else:
-        # Aligne les syntaxes pour un rendu code-block propre
-        max_syntax = max(len(f"{p}{syntax}") for syntax, _ in items)
-        lines = [
-            f"{p}{syntax}".ljust(max_syntax + 2) + f"→ {desc}"
-            for syntax, desc in items
-        ]
-        em.description = "```\n" + "\n".join(lines) + "\n```"
-
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
-
-
-def build_hierarchy_embed(user_rank):
-    """Embed hiérarchie — uniquement visible pour Owner+ (min_rank=2)."""
-    em = discord.Embed(title="📋  Hiérarchie", color=embed_color())
-    lines = ["```\nBuyer > Sys > Owner > Whitelist > Tout le monde\n```\n"]
-    # On affiche chaque niveau, mais on marque celui du user
-    levels = [
-        (4, "👑 **Buyer**",     "Accès total, `*prefix`, `*setlog`, `*sys`/`*unsys`"),
-        (3, "🔧 **Sys**",       "`*allow`/`*unallow`, `*setenchere`, `*ban`/`*unban`, `*owner`/`*unowner`, admin éco"),
-        (2, "⭐ **Owner**",      "`*enchere`, `*drop`, `*wl`/`*unwl`"),
-        (1, "✨ **Whitelist**",  "Statut privilégié"),
-        (0, "👤 **Tout le monde**", "Jeux et commandes éco"),
-    ]
-    for rank, name, desc in levels:
-        marker = " ← **toi**" if rank == user_rank else ""
-        lines.append(f"> {name} — {desc}{marker}")
-    em.description = "\n".join(lines)
-    em.set_footer(text="Made by gp ・ Velda")
-    return em
-
-
-def build_home_embed(user_rank):
-    """Embed d'accueil personnalisé : ne liste que les catégories accessibles au user."""
-    p = get_prefix_cached()
-    em = discord.Embed(color=embed_color())
-    em.set_author(name="Velda ─ Panel d'aide")
-
-    rank_label = rank_name(user_rank)
-    intro = (
-        f"```\n🕐  {get_french_time()}\n```\n"
-        f"Bienvenue sur **Velda**.\n\n"
-        f"**Prefix :** `{p}` ・ **Ton rang :** {rank_label}\n\n"
+    em = discord.Embed(
+        title=f"{emoji}  {title}",
+        description=subtitle if subtitle else None,
+        color=embed_color(),
     )
 
-    # Liste uniquement les catégories visibles au user (hors Accueil lui-même)
+    if guild:
+        _apply_guild_thumbnail(em, guild)
+
+    sections = accessible_sections(category_key, user_rank)
+    items_flat = accessible_items(category_key, user_rank)
+
+    if not sections and not items_flat:
+        em.add_field(
+            name="⛔ Aucune commande accessible",
+            value="Tu n'as pas les permissions pour cette catégorie.",
+            inline=False,
+        )
+    elif sections:
+        # Nouvelle structure : une field par section avec commandes en code inline
+        for s_emoji, s_title, s_items in sections:
+            # Formater les commandes en ligne, façon "code inline"
+            # Si max 2-3 commandes courtes : sur une ligne. Sinon on fait des lignes de 1-2
+            cmd_lines = []
+            for syntax, desc in s_items:
+                cmd_lines.append(f"`{p}{syntax}` — {desc}")
+            em.add_field(
+                name=f"{s_emoji} {s_title}",
+                value="\n".join(cmd_lines),
+                inline=False,
+            )
+    else:
+        # Fallback ancienne structure
+        lines = [f"`{p}{syntax}` — {desc}" for syntax, desc in items_flat]
+        em.add_field(name="Commandes", value="\n".join(lines), inline=False)
+
+    # Bloc astuce en bas (uniquement pour les catégories de base)
+    if category_key in ("eco", "jeux"):
+        em.add_field(
+            name="💡 Astuce",
+            value=(
+                "Chaque commande a un raccourci court !\n"
+                f"Ex : `{p}wk` au lieu de `{p}work`, `{p}pr` au lieu de `{p}profil`."
+            ),
+            inline=False,
+        )
+
+    em.set_footer(text="Made by gp ・ Velda")
+    return em
+
+
+def build_hierarchy_embed(user_rank, guild=None):
+    """Embed hiérarchie — uniquement visible pour Owner+ (min_rank=2)."""
+    em = discord.Embed(
+        title="📋  Hiérarchie",
+        description="Les différents rangs du bot et leurs pouvoirs.",
+        color=embed_color(),
+    )
+    if guild:
+        _apply_guild_thumbnail(em, guild)
+
+    levels = [
+        (4, "👑", "Buyer",      "Accès total au bot"),
+        (3, "🔧", "Sys",        "Config, modération, admin éco"),
+        (2, "⭐", "Owner",       "Événements (enchères, drops), gestion whitelist"),
+        (1, "✨", "Whitelist",   "Statut privilégié"),
+        (0, "👤", "Membre",      "Jeux et commandes éco de base"),
+    ]
+    for rank, icon, name, desc in levels:
+        marker = "  ← **toi**" if rank == user_rank else ""
+        em.add_field(
+            name=f"{icon} {name}{marker}",
+            value=desc,
+            inline=False,
+        )
+
+    em.set_footer(text="Made by gp ・ Velda")
+    return em
+
+
+def build_home_embed(user_rank, guild=None):
+    """Embed d'accueil personnalisé : ne liste que les catégories accessibles au user."""
+    p = get_prefix_cached()
+    em = discord.Embed(
+        title="🏠  Panel d'aide — Velda",
+        description=(
+            f"Bienvenue sur **Velda**, le bot casino de Meira.\n"
+            f"**Prefix :** `{p}` ・ **Ton rang :** {rank_name(user_rank)}\n\n"
+            f"*Choisis une catégorie ci-dessous pour voir ses commandes.*"
+        ),
+        color=embed_color(),
+    )
+    if guild:
+        _apply_guild_thumbnail(em, guild)
+
+    # Liste uniquement les catégories visibles au user, regroupées par thème
     category_descriptions = {
         "eco":        "Bal, daily, dépôts, give, rob...",
         "jeux":       "Slots, BJ, jackpot, roulette, dés, PFC...",
@@ -1979,29 +2132,44 @@ def build_home_embed(user_rank):
         "system":     "Configuration du bot",
         "hierarchy":  "Qui peut faire quoi",
     }
-    visible_lines = []
-    for key, label in category_descriptions.items():
+
+    # Grouper en 2 fields : "Pour toi" (commandes joueur) et "Admin" (pour Sys+)
+    player_keys = ["eco", "jeux", "shop", "classement", "vocal", "loto"]
+    admin_keys  = ["speciaux", "shop_admin", "config", "admin", "perms", "system", "hierarchy"]
+
+    player_lines = []
+    for key in player_keys:
         if category_visible(key, user_rank):
             cat = HELP_CATEGORIES[key]
-            visible_lines.append(f"> {cat['emoji']} **{cat['label']}** — {label}")
+            player_lines.append(f"{cat['emoji']} **{cat['label']}** — {category_descriptions[key]}")
+    if player_lines:
+        em.add_field(name="🎮 Pour toi", value="\n".join(player_lines), inline=False)
 
-    em.description = intro + "\n".join(visible_lines) if visible_lines else intro
-    em.set_footer(text="Made by gp ・ Velda")
+    admin_lines = []
+    for key in admin_keys:
+        if category_visible(key, user_rank):
+            cat = HELP_CATEGORIES[key]
+            admin_lines.append(f"{cat['emoji']} **{cat['label']}** — {category_descriptions[key]}")
+    if admin_lines:
+        em.add_field(name="🛠️ Staff & Admin", value="\n".join(admin_lines), inline=False)
+
+    em.set_footer(text=f"Made by gp ・ Velda ・ {get_french_time()}")
     return em
 
 
-def build_embed_for(category_key, user_rank):
+def build_embed_for(category_key, user_rank, guild=None):
     """Dispatcher : renvoie l'embed correspondant à la clé demandée."""
     if category_key == "home":
-        return build_home_embed(user_rank)
+        return build_home_embed(user_rank, guild=guild)
     if category_key == "hierarchy":
-        return build_hierarchy_embed(user_rank)
-    return build_category_embed(category_key, user_rank)
+        return build_hierarchy_embed(user_rank, guild=guild)
+    return build_category_embed(category_key, user_rank, guild=guild)
 
 
 class HelpDropdown(discord.ui.Select):
-    def __init__(self, user_rank):
+    def __init__(self, user_rank, guild=None):
         self.user_rank = user_rank
+        self.guild = guild
         options = [discord.SelectOption(label="Accueil", emoji="🏠", value="home")]
         # Ajoute uniquement les catégories dont l'utilisateur peut voir quelque chose
         for key, cat in HELP_CATEGORIES.items():
@@ -2015,23 +2183,23 @@ class HelpDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Double-check : on n'affiche que ce que le user peut voir (au cas où)
         key = self.values[0]
         if key != "home" and not category_visible(key, self.user_rank):
             return await interaction.response.send_message(
                 "Tu n'as pas accès à cette catégorie.", ephemeral=True
             )
         await interaction.response.edit_message(
-            embed=build_embed_for(key, self.user_rank), view=self.view
+            embed=build_embed_for(key, self.user_rank, guild=self.guild), view=self.view
         )
 
 
 class HelpView(discord.ui.View):
-    def __init__(self, author_id, user_rank):
+    def __init__(self, author_id, user_rank, guild=None):
         super().__init__(timeout=120)
         self.author_id = author_id
         self.user_rank = user_rank
-        self.add_item(HelpDropdown(user_rank))
+        self.guild = guild
+        self.add_item(HelpDropdown(user_rank, guild=guild))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         # Seul celui qui a lancé *help peut naviguer dans son menu
@@ -2050,8 +2218,8 @@ class HelpView(discord.ui.View):
 @bot.command(name="help")
 async def _help(ctx):
     user_rank = get_rank_db(ctx.author.id)
-    view = HelpView(ctx.author.id, user_rank)
-    await ctx.send(embed=build_home_embed(user_rank), view=view)
+    view = HelpView(ctx.author.id, user_rank, guild=ctx.guild)
+    await ctx.send(embed=build_home_embed(user_rank, guild=ctx.guild), view=view)
 
 
 # ========================= SYSTÈME =========================
