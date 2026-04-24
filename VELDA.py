@@ -2217,9 +2217,40 @@ class HelpView(discord.ui.View):
 
 @bot.command(name="help")
 async def _help(ctx):
+    """Envoie le panel d'aide en DM pour ne pas polluer le chat."""
     user_rank = get_rank_db(ctx.author.id)
     view = HelpView(ctx.author.id, user_rank, guild=ctx.guild)
-    await ctx.send(embed=build_home_embed(user_rank, guild=ctx.guild), view=view)
+    home_embed = build_home_embed(user_rank, guild=ctx.guild)
+
+    # Tentative d'envoi en DM
+    try:
+        await ctx.author.send(embed=home_embed, view=view)
+        # Confirmation discrète dans le salon : réaction ✉️ + message auto-suppr
+        try:
+            await ctx.message.add_reaction("✉️")
+        except discord.HTTPException:
+            pass
+        try:
+            confirmation = await ctx.send(
+                f"📬 {ctx.author.mention}, je t'ai envoyé le panel d'aide en DM."
+            )
+            await asyncio.sleep(5)
+            await confirmation.delete()
+        except discord.HTTPException:
+            pass
+    except discord.Forbidden:
+        # DM fermé → fallback dans le salon avec un petit avertissement
+        await ctx.send(
+            embed=home_embed,
+            view=view,
+            content=(
+                f"⚠️ {ctx.author.mention} je n'ai pas pu t'envoyer le help en DM "
+                f"(DM fermés). Voilà ton panel directement ici :"
+            ),
+        )
+    except discord.HTTPException as e:
+        log.warning(f"Échec envoi help en DM à {ctx.author} : {e}")
+        await ctx.send(embed=home_embed, view=view)
 
 
 # ========================= SYSTÈME =========================
