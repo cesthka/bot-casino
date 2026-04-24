@@ -2473,11 +2473,15 @@ PROFILE_BG_URL = "https://media.discordapp.net/attachments/1496475888592617653/1
 
 # Paths des fonts (Linux / Railway / VPS standard)
 _FONT_BOLD_CANDIDATES = [
+    "fonts/DejaVuSans-Bold.ttf",  # Local repo (priorité)
+    "./fonts/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
 ]
 _FONT_EMOJI_CANDIDATES = [
+    "fonts/NotoColorEmoji.ttf",  # Local repo (priorité)
+    "./fonts/NotoColorEmoji.ttf",
     "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
     "/usr/share/fonts/noto/NotoColorEmoji.ttf",
 ]
@@ -2492,6 +2496,17 @@ def _find_font(candidates):
 
 FONT_BOLD_PATH = _find_font(_FONT_BOLD_CANDIDATES)
 FONT_EMOJI_PATH = _find_font(_FONT_EMOJI_CANDIDATES)
+
+# Log au démarrage pour débug
+if FONT_BOLD_PATH:
+    log.info(f"[profil] Font principale : {FONT_BOLD_PATH}")
+else:
+    log.warning("[profil] ⚠️ Aucune font Bold trouvée, fallback sur default Pillow (moche)")
+if FONT_EMOJI_PATH:
+    log.info(f"[profil] Font emoji : {FONT_EMOJI_PATH}")
+else:
+    log.warning("[profil] ⚠️ Aucune font Emoji trouvée, les emojis ne s'afficheront PAS. "
+                "Ajoute 'fonts/NotoColorEmoji.ttf' dans ton repo.")
 
 
 # Noms stylés des jeux pour "FAVORI"
