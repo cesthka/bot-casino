@@ -1748,14 +1748,14 @@ HELP_CATEGORIES = {
         "title": "💰  Économie",
         "items": [
             # (syntaxe, description, min_rank)
-            ("bal [@user]",        "Balance d'un membre",     0),
+            ("bal / b [@user]",    "Balance d'un membre",     0),
             ("daily / dy",         "Récompense quotidienne",  0),
             ("dep [somme/all]",    "Déposer en bank",         0),
             ("with [somme/all]",   "Retirer de la bank",      0),
-            ("give [somme] @user", "Donner des Ryo",          0),
-            ("rob @user",          "Voler (5-30% main)",      0),
-            ("fame @user",         "Famer quelqu'un",         0),
-            ("profil [@user]",     "Carte de profil visuelle",0),
+            ("give / gv [somme] @user", "Donner des Ryo",          0),
+            ("rob / rb @user",          "Voler (5-30% main)",      0),
+            ("fame / fm @user",         "Famer quelqu'un",         0),
+            ("profil / pr [@user]",     "Carte de profil visuelle",0),
         ],
     },
     "jeux": {
@@ -1763,15 +1763,15 @@ HELP_CATEGORIES = {
         "label": "Jeux",
         "title": "🎮  Jeux",
         "items": [
-            ("slots <mise/all>",             "Machine à sous",               0),
-            ("bj <mise/all>",                "Blackjack",                    0),
-            ("jackpot <mise/all>",           "Jackpot avec pot partagé",     0),
+            ("slots / sl <mise/all>",             "Machine à sous",               0),
+            ("bj / blackjack <mise/all>",                "Blackjack",                    0),
+            ("jackpot / jp <mise/all>",           "Jackpot avec pot partagé",     0),
             ("pot",                          "Voir la cagnotte du jackpot",  0),
-            ("roulette <mise> <type>",       "Roulette (rouge/noir/0-36)",   0),
-            ("des <mise>",                   "Lance un dé contre le bot",    0),
-            ("pfc <mise> <choix>",           "Pierre-Feuille-Ciseaux",       0),
+            ("roulette / rl <mise> <type>",       "Roulette (rouge/noir/0-36)",   0),
+            ("des / dice <mise>",                   "Lance un dé contre le bot",    0),
+            ("pfc / rps <mise> <choix>",     "Pierre-Feuille-Ciseaux",       0),
             ("fish",                         "Pêche (30min cooldown)",       0),
-            ("work",                         "Boulot (1h cooldown)",         0),
+            ("work / wk",                    "Boulot (1h cooldown)",         0),
             ("cooldowns",                    "Voir les cooldowns des jeux",  0),
         ],
     },
@@ -2710,7 +2710,7 @@ async def generate_profile_card_image(
     return buf
 
 
-@bot.command(name="profil", aliases=["profile"])
+@bot.command(name="profil", aliases=["profile", "pr"])
 async def _profil(ctx, *, user_input: str = None):
     """Affiche la carte de profil d'un utilisateur (soi-même par défaut)."""
     if await check_ban(ctx):
@@ -2784,7 +2784,7 @@ async def _profil(ctx, *, user_input: str = None):
 
 # ========================= ÉCONOMIE =========================
 
-@bot.command(name="bal")
+@bot.command(name="bal", aliases=["b"])
 async def _bal(ctx, *, user_input: str = None):
     if await check_ban(ctx):
         return
@@ -2899,7 +2899,7 @@ async def _withdraw(ctx, amount_str: str = None):
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
-@bot.command(name="give")
+@bot.command(name="give", aliases=["gv"])
 async def _give(ctx, amount_str: str = None, *, user_input: str = None):
     if await check_ban(ctx):
         return
@@ -2934,7 +2934,7 @@ async def _give(ctx, amount_str: str = None, *, user_input: str = None):
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
-@bot.command(name="rob")
+@bot.command(name="rob", aliases=["rb"])
 async def _rob(ctx, *, user_input: str = None):
     if await check_ban(ctx):
         return
@@ -2985,7 +2985,7 @@ async def _rob(ctx, *, user_input: str = None):
     await ctx.send(embed=action_embed(ctx.author, desc, color=0x43b581))
 
 
-@bot.command(name="fame")
+@bot.command(name="fame", aliases=["fm"])
 async def _fame(ctx, *, user_input: str = None):
     if await check_ban(ctx):
         return
@@ -3025,7 +3025,7 @@ async def _fame(ctx, *, user_input: str = None):
 
 # ========================= JEUX =========================
 
-@bot.command(name="work")
+@bot.command(name="work", aliases=["wk"])
 async def _work(ctx):
     if await check_ban(ctx):
         return
@@ -3112,7 +3112,7 @@ async def _fish(ctx):
     await ctx.send(embed=action_embed(ctx.author, description, color=rarity_colors.get(rarity, embed_color())))
 
 
-@bot.command(name="slots")
+@bot.command(name="slots", aliases=["sl"])
 async def _slots(ctx, amount_str: str = None):
     if await check_ban(ctx):
         return
@@ -3192,7 +3192,7 @@ async def _slots(ctx, amount_str: str = None):
         await ctx.send(embed=action_embed(ctx.author, description, color=color))
 
 
-@bot.command(name="jackpot")
+@bot.command(name="jackpot", aliases=["jp"])
 async def _jackpot(ctx, amount_str: str = None):
     """Nouveau jackpot : pool partagé. Ta mise alimente le pot.
     3x 7️⃣ = tu empoches tout le pot + mise x50. Autres combinaisons = gains classiques."""
@@ -3322,7 +3322,7 @@ async def _pot(ctx):
 
 # ========================= NOUVEAUX JEUX =========================
 
-@bot.command(name="roulette")
+@bot.command(name="roulette", aliases=["rl"])
 async def _roulette(ctx, amount_str: str = None, bet_type: str = None):
     """
     Roulette européenne.
@@ -3736,7 +3736,7 @@ class BlackjackView(discord.ui.View):
         self.stop()
 
 
-@bot.command(name="bj")
+@bot.command(name="bj", aliases=["blackjack"])
 async def _bj(ctx, amount_str: str = None):
     if await check_ban(ctx):
         return
