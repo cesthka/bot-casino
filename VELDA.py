@@ -2473,14 +2473,18 @@ PROFILE_BG_URL = "https://media.discordapp.net/attachments/1496475888592617653/1
 
 # Paths des fonts (Linux / Railway / VPS standard)
 _FONT_BOLD_CANDIDATES = [
-    "fonts/DejaVuSans-Bold.ttf",  # Local repo (priorité)
+    "DejaVuSans-Bold.ttf",  # Racine du repo (priorité 1)
+    "./DejaVuSans-Bold.ttf",
+    "fonts/DejaVuSans-Bold.ttf",  # Dossier fonts/ du repo
     "./fonts/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
 ]
 _FONT_EMOJI_CANDIDATES = [
-    "fonts/NotoColorEmoji.ttf",  # Local repo (priorité)
+    "NotoColorEmoji.ttf",  # Racine du repo (priorité 1)
+    "./NotoColorEmoji.ttf",
+    "fonts/NotoColorEmoji.ttf",  # Dossier fonts/ du repo
     "./fonts/NotoColorEmoji.ttf",
     "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
     "/usr/share/fonts/noto/NotoColorEmoji.ttf",
