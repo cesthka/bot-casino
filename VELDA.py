@@ -2668,7 +2668,7 @@ async def _resetlevel(ctx, *, user_input: str = None):
 # ========================= CARTE DE PROFIL (IMAGE GÉNÉRÉE) =========================
 
 # URL du background (hardcodé, toujours le même pour tout le serveur)
-PROFILE_BG_URL = "https://media.discordapp.net/attachments/1496475888592617653/1497149302386987148/ade86e26-5e91-4608-be63-2ec9eef506d9.png?ex=69ec7871&is=69eb26f1&hm=aba8ca333a27d362cc9c425a0a1f6a5fa22d6ff52be94b97a4776f9b28ecf519&=&format=webp&quality=lossless&width=777&height=437"
+PROFILE_BG_URL = "https://media.discordapp.net/attachments/1494413317790371862/1497672471497670736/ade86e26-5e91-4608-be63-2ec9eef506d9.png?ex=69ee5fae&is=69ed0e2e&hm=71e19b4e4e6b6858b0053d9437276109717cff74d4fa21d5d0506fb1ad353d21&=&format=webp&quality=lossless&width=550&height=310"
 
 # Paths des fonts (Linux / Railway / VPS standard)
 _FONT_BOLD_CANDIDATES = [
